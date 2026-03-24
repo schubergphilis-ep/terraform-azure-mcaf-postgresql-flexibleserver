@@ -1,23 +1,24 @@
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_postgresql_flexible_server" "this" {
-  # checkov:skip=CKV2_AZURE_57: networking is the caller's choice: VNet integration via delegated_subnet_id, or a private endpoint created by the caller (e.g. terraform-azure-mcaf-private-endpoints)
   name                = var.name
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  administrator_login           = var.password_auth_enabled ? var.administrator_username : null
-  administrator_password        = var.password_auth_enabled ? random_password.password[0].result : null
-  backup_retention_days         = var.backup_retention_days
-  create_mode                   = "Default" # TODO: support DR scenarios
-  delegated_subnet_id           = var.delegated_subnet_id
-  private_dns_zone_id           = var.private_dns_zone_id
-  public_network_access_enabled = var.public_network_access_enabled
-  sku_name                      = var.sku
-  storage_mb                    = local.storage_mb
-  geo_redundant_backup_enabled  = var.geo_redundant_backup_enabled
-  version                       = var.server_version
-  zone                          = var.high_available ? "1" : null
+  administrator_login               = var.password_auth_enabled ? var.administrator_username : null
+  administrator_password            = var.password_auth_enabled && var.administrator_ephemeral_password_version == null ? random_password.password.result : null
+  administrator_password_wo         = var.administrator_ephemeral_password
+  administrator_password_wo_version = var.administrator_ephemeral_password_version
+  backup_retention_days             = var.backup_retention_days
+  create_mode                       = "Default" # TODO: support DR scenarios
+  delegated_subnet_id               = var.delegated_subnet_id
+  private_dns_zone_id               = var.private_dns_zone_id
+  public_network_access_enabled     = var.public_network_access_enabled
+  sku_name                          = var.sku
+  storage_mb                        = var.storage_size * 1024
+  geo_redundant_backup_enabled      = var.geo_redundant_backup_enabled
+  version                           = var.server_version
+  zone                              = var.high_available ? "1" : null
 
   authentication {
     password_auth_enabled         = var.password_auth_enabled
@@ -43,43 +44,22 @@ resource "azurerm_postgresql_flexible_server" "this" {
     }
   }
 
-  dynamic "maintenance_window" {
-    for_each = var.maintenance_window != null ? [var.maintenance_window] : []
-    content {
-      day_of_week  = maintenance_window.value.day_of_week
-      start_hour   = maintenance_window.value.start_hour
-      start_minute = maintenance_window.value.start_minute
-    }
-  }
-
   lifecycle {
     ignore_changes = [
       zone,
       high_availability
     ]
-
-    precondition {
-      condition     = var.password_auth_enabled || var.active_directory_auth_enabled
-      error_message = "Enable at least one of password_auth_enabled and active_directory_auth_enabled."
-    }
-
-    precondition {
-      condition     = var.password_auth_enabled || length(local.password_owner_databases) == 0
-      error_message = "Password owner accounts need password_auth_enabled = true, or set object_id (federated) on local_owner_account for: ${join(", ", local.password_owner_databases)}."
-    }
   }
 }
 
 resource "random_password" "password" {
-  count = var.password_auth_enabled ? 1 : 0
-
   length           = 48
   special          = true
-  override_special = var.use_password_override_special ? "!#$&()-_=+[]{}?" : null
+  override_special = "!#$&()-_=+[]{}?"
 }
 
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "this" {
-  for_each = data.azuread_group.active_directory_administrator_groups
+  for_each = var.active_directory_administrator_groups
 
   server_name         = azurerm_postgresql_flexible_server.this.name
   resource_group_name = var.resource_group_name
@@ -94,26 +74,11 @@ module "database" {
 
   source = "./modules/database"
 
-  providers = {
-    postgresql.database = postgresql.database
-  }
+  postgresql_server_id                     = azurerm_postgresql_flexible_server.this.id
+  name                                     = each.key
+  charset                                  = each.value.charset
+  collation                                = each.value.collation
+  postgresql_server_administrator_username = var.password_auth_enabled ? coalesce(each.value.administrator_username, var.administrator_username) : null
 
-  postgresql_server_id       = azurerm_postgresql_flexible_server.this.id
-  name                       = each.key
-  charset                    = each.value.charset
-  collation                  = each.value.collation
-  provisioning_identity_name = coalesce(each.value.administrator_username, var.provisioning_identity_name, var.administrator_username)
-
-  reader_groups                      = each.value.reader_groups
-  reader_managed_identity_object_ids = each.value.reader_managed_identity_object_ids
-  writer_groups                      = each.value.writer_groups
-  writer_managed_identity_object_ids = each.value.writer_managed_identity_object_ids
-  admin_groups                       = each.value.admin_groups
-  admin_identity_object_ids          = each.value.admin_identity_object_ids
-  local_owner_account                = each.value.local_owner_account
-}
-
-moved {
-  from = random_password.password
-  to   = random_password.password[0]
+  local_owner_account = each.value.local_owner_account
 }
