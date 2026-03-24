@@ -14,7 +14,10 @@ variable "location" {
 }
 
 variable "active_directory_administrator_groups" {
-  type    = list(string)
+  type = set(object({
+    object_id    = string
+    display_name = string
+  }))
   default = []
 }
 
@@ -46,7 +49,7 @@ variable "high_available" {
 variable "server_version" {
   type        = string
   description = "The version of the postgresql server. "
-  default     = "14"
+  default     = "17"
 }
 
 variable "sku" {
@@ -72,12 +75,6 @@ variable "private_dns_zone_id" {
   default     = null
 }
 
-variable "use_password_override_special" {
-  description = "Set true to use '!#$&()-_=+[]{}?' as special characters, false for default behavior."
-  type        = bool
-  default     = true
-}
-
 variable "public_network_access_enabled" {
   type        = bool
   description = "Whether public network access is enabled for the PostgreSQL Flexible Server."
@@ -88,6 +85,17 @@ variable "password_auth_enabled" {
   type        = bool
   description = "Whether password authentication is enabled for the PostgreSQL Flexible Server."
   default     = true
+}
+
+variable "administrator_ephemeral_password" {
+  default   = null
+  ephemeral = true
+  type      = string
+}
+
+variable "administrator_ephemeral_password_version" {
+  default = null
+  type    = number
 }
 
 variable "active_directory_auth_enabled" {
@@ -114,12 +122,6 @@ variable "high_availability_standby_zone" {
   default     = "2"
 }
 
-variable "private_service_connection_is_manual" {
-  type        = bool
-  description = "Whether the private service connection requires manual approval."
-  default     = false
-}
-
 variable "geo_redundant_backup_enabled" {
   type        = bool
   description = "Whether geo-redundant backup is enabled for the PostgreSQL Flexible Server."
@@ -137,38 +139,23 @@ variable "databases" {
       generate_password = optional(bool, true)
     }))
 
-    reader_groups = optional(list(object({
-      group_name  = string
-      role_prefix = optional(string)
-    })), [])
+    readers = optional(set(object({
+      object_id    = string
+      display_name = string
+      role_prefix  = optional(string)
+    })))
 
-    reader_managed_identity_object_ids = optional(list(object({
-      object_id      = string
-      principal_name = string
-      role_prefix    = optional(string)
-    })), [])
+    writers = optional(set(object({
+      object_id    = string
+      display_name = string
+      role_prefix  = optional(string)
+    })))
 
-    writer_groups = optional(list(object({
-      group_name  = string
-      role_prefix = optional(string)
-    })), [])
-
-    writer_managed_identity_object_ids = optional(list(object({
-      object_id      = string
-      principal_name = string
-      role_prefix    = optional(string)
-    })), [])
-
-    admin_groups = optional(list(object({
-      group_name  = string
-      role_prefix = optional(string)
-    })), [])
-
-    admin_identity_object_ids = optional(list(object({
-      object_id      = string
-      principal_name = string
-      role_prefix    = optional(string)
-    })), [])
+    admins = optional(set(object({
+      object_id    = string
+      display_name = string
+      role_prefix  = optional(string)
+    })))
   }))
   default     = {}
   description = <<-DOC

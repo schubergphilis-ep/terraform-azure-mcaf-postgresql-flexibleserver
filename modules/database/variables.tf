@@ -20,59 +20,36 @@ variable "postgresql_server_id" {
   description = "The id of the postgresql server on which to create the database."
 }
 
-variable "reader_groups" {
-  type = list(object({
-    role_prefix = optional(string)
-    group_name  = string
+variable "readers" {
+  type = set(object({
+    object_id    = string
+    display_name = string
+    role_prefix  = optional(string)
   }))
   default = []
 }
 
-variable "reader_managed_identity_object_ids" {
-  type = list(object({
-    object_id      = string
-    principal_name = string
-    role_prefix    = optional(string)
+variable "writers" {
+  type = set(object({
+    object_id    = string
+    display_name = string
+    role_prefix  = optional(string)
   }))
   default = []
 }
 
-variable "writer_groups" {
-  type = list(object({
-    group_name  = string
-    role_prefix = optional(string)
-  }))
-  default = []
-}
-
-variable "writer_managed_identity_object_ids" {
-  type = list(object({
-    object_id      = string
-    principal_name = string
-    role_prefix    = optional(string)
-  }))
-  default = []
-}
-
-variable "admin_groups" {
-  type = list(object({
-    group_name  = string
-    role_prefix = optional(string)
-  }))
-  default = []
-}
-
-variable "admin_identity_object_ids" {
-  type = list(object({
-    object_id      = string
-    principal_name = string
-    role_prefix    = optional(string)
+variable "admins" {
+  type = set(object({
+    object_id    = string
+    display_name = string
+    role_prefix  = optional(string)
   }))
   default = []
 }
 
 variable "postgresql_server_administrator_username" {
-  type = string
+  type    = string
+  default = null
 }
 
 variable "local_owner_account" {

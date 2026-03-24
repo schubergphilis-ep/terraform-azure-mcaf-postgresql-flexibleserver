@@ -9,8 +9,8 @@ output "name" {
 output "local_owner_account" {
   description = "Local PostgreSQL owner account credentials. Password is null if generate_password was set to false."
   sensitive   = true
-  value = local.create_local_owner ? {
+  value = var.local_owner_account != null ? {
     username = var.local_owner_account.username
-    password = local.generate_owner_password ? random_password.local_owner[0].result : null
+    password = var.local_owner_account.generate_password ? random_password.local_owner[0].result : null
   } : null
 }
