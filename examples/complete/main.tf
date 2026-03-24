@@ -122,8 +122,7 @@ module "postgresql" {
   active_directory_auth_enabled = true
 
   # Network configuration
-  public_network_access_enabled        = false
-  private_service_connection_is_manual = false
+  public_network_access_enabled = false
 
   # Customer-managed key
   customer_managed_key = {
