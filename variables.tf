@@ -13,28 +13,40 @@ variable "location" {
   description = "The location of the postgresql server."
 }
 
+variable "administrator_username" {
+  type    = string
+  default = "sbp_administrator"
+}
+
+variable "administrator_ephemeral_password" {
+  default   = null
+  ephemeral = true
+  type      = string
+}
+
+variable "administrator_ephemeral_password_version" {
+  default = null
+  type    = number
+}
+
+variable "password_auth_enabled" {
+  type        = bool
+  description = "Whether password authentication is enabled for the PostgreSQL Flexible Server."
+  default     = true
+}
+
+variable "active_directory_auth_enabled" {
+  type        = bool
+  description = "Whether Active Directory authentication is enabled for the PostgreSQL Flexible Server."
+  default     = true
+}
+
 variable "active_directory_administrator_groups" {
   type = set(object({
     object_id    = string
     display_name = string
   }))
   default = []
-}
-
-variable "administrator_username" {
-  type    = string
-  default = "sbp_administrator"
-}
-
-variable "provisioning_identity_name" {
-  type        = string
-  description = "The PostgreSQL login name that the postgresql provider authenticates as when creating roles and privileges. Defaults to the server administrator username (password mode). When password authentication is disabled and the provider connects via Entra ID, set this to the Entra principal name Terraform runs as so that object-owner default privileges are attributed to the correct owner. Can be overridden per database via the database's administrator_username. Must be the role name as PostgreSQL stores it: at most 63 characters, as PostgreSQL truncates longer role names (e.g. guest UPNs with #EXT#)."
-  default     = null
-
-  validation {
-    condition     = var.provisioning_identity_name == null || length(coalesce(var.provisioning_identity_name, "x")) <= 63
-    error_message = "provisioning_identity_name must be at most 63 characters, as PostgreSQL truncates longer role names. Use the truncated name (or a service principal's object ID)."
-  }
 }
 
 variable "backup_retention_days" {
@@ -59,7 +71,7 @@ variable "high_available" {
 
 variable "server_version" {
   type        = string
-  description = "The version of the postgresql server. "
+  description = "The version of the postgresql server."
   default     = "17"
 }
 
@@ -92,29 +104,6 @@ variable "public_network_access_enabled" {
   default     = false
 }
 
-variable "password_auth_enabled" {
-  type        = bool
-  description = "Whether password authentication is enabled for the PostgreSQL Flexible Server. Opt-in: when false (the default), the server is Entra ID only and gets no local administrator login or password. Set to true for a local administrator with a generated password, or for password owner accounts."
-  default     = false
-}
-
-variable "administrator_ephemeral_password" {
-  default   = null
-  ephemeral = true
-  type      = string
-}
-
-variable "administrator_ephemeral_password_version" {
-  default = null
-  type    = number
-}
-
-variable "active_directory_auth_enabled" {
-  type        = bool
-  description = "Whether Active Directory authentication is enabled for the PostgreSQL Flexible Server."
-  default     = true
-}
-
 variable "identity_type" {
   type        = string
   description = "The type of identity to use for the PostgreSQL Flexible Server. Possible values are 'UserAssigned' or 'SystemAssigned'."
@@ -139,55 +128,50 @@ variable "geo_redundant_backup_enabled" {
   default     = true
 }
 
-variable "maintenance_window" {
-  type = object({
-    day_of_week  = optional(number, 0)
-    start_hour   = optional(number, 0)
-    start_minute = optional(number, 0)
-  })
-  default     = null
-  description = <<-DOC
-    A custom maintenance window for the PostgreSQL Flexible Server. If not specified, the system-managed maintenance window is used.
-
-    The maintenance window object supports the following properties:
-    - `day_of_week`  - (Optional) The day of the week for the maintenance window, where `0` is Sunday and `6` is Saturday. Defaults to `0`.
-    - `start_hour`   - (Optional) The start hour (UTC) for the maintenance window, between `0` and `23`. Defaults to `0`.
-    - `start_minute` - (Optional) The start minute for the maintenance window, between `0` and `59`. Defaults to `0`.
-  DOC
-}
-
 variable "databases" {
   type = map(object({
     charset                = optional(string, "UTF8")
     collation              = optional(string, "en_US.utf8")
     administrator_username = optional(string)
 
-    local_owner_account = optional(object({
+    local_readers = optional(set(object({
       username          = string
       generate_password = optional(bool, true)
-      object_id         = optional(string)
-      principal_type    = optional(string, "ServicePrincipal")
-      federated         = optional(bool)
-    }))
+      ephemeral_password_version = optional(number)
+    })), [])
+
+
+    local_writers = optional(set(object({
+      username          = string
+      generate_password = optional(bool, true)
+      ephemeral_password_version = optional(number)
+    })), [])
+
+    local_admins = optional(set(object({
+      username          = string
+      generate_password = optional(bool, true)
+      ephemeral_password_version = optional(number)
+    })), [])
 
     readers = optional(set(object({
       object_id    = string
       display_name = string
       role_prefix  = optional(string)
-    })))
+    })), [])
 
     writers = optional(set(object({
       object_id    = string
       display_name = string
       role_prefix  = optional(string)
-    })))
+    })), [])
 
     admins = optional(set(object({
       object_id    = string
       display_name = string
       role_prefix  = optional(string)
-    })))
+    })), [])
   }))
+
   default     = {}
   description = <<-DOC
     A map of databases to create on the PostgreSQL Flexible Server. The map key is used as the database name.
@@ -224,10 +208,27 @@ variable "databases" {
       - `principal_name` - (Required) The principal name of the managed identity.
       - `role_prefix`    - (Optional) A prefix for the database role name.
 
-    - `local_owner_account` - (Optional) A PostgreSQL account with owner access, for applications that manage their own schema. Authentication mode is selected by whether `object_id` is set: password mode (default) creates a role with a password; federated mode (`object_id` set) creates an Entra ID (Azure AD) role that logs on with a token and has no password. The Entra identity itself is not created by this module.
-      - `username`          - (Required) The name of the PostgreSQL owner role.
-      - `generate_password` - (Optional) Password mode only. Whether to auto-generate a password. Defaults to `true`. Set to `false` if the password is managed outside of Terraform.
-      - `object_id`         - (Optional) The Entra ID object ID of a caller-managed managed identity, service principal, or group. Setting this switches the owner account to federated (token) logon.
-      - `principal_type`    - (Optional) The Entra principal type: `ServicePrincipal`, `Group`, or `User`. Defaults to `ServicePrincipal`.
+    - `local_owner_account` - (Optional) A local PostgreSQL account with owner access for applications that do not support AD authentication.
+      - `username`          - (Required) The username for the local account.
+      - `generate_password` - (Optional) Whether to auto-generate a password. Defaults to `true`. Set to `false` if password will be managed outside of Terraform.
   DOC
 }
+
+variable "local_readers_ephemeral_passwords" {
+  type      = map(string)
+  ephemeral = true
+  default   = null
+}
+
+variable "local_writers_ephemeral_passwords" {
+  type      = map(string)
+  ephemeral = true
+  default   = null
+}
+
+variable "local_admins_ephemeral_passwords" {
+  type      = map(string)
+  ephemeral = true
+  default   = null
+}
+
