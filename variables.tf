@@ -13,17 +13,40 @@ variable "location" {
   description = "The location of the postgresql server."
 }
 
+variable "administrator_username" {
+  type    = string
+  default = "sbp_administrator"
+}
+
+variable "administrator_ephemeral_password" {
+  default   = null
+  ephemeral = true
+  type      = string
+}
+
+variable "administrator_ephemeral_password_version" {
+  default = null
+  type    = number
+}
+
+variable "password_auth_enabled" {
+  type        = bool
+  description = "Whether password authentication is enabled for the PostgreSQL Flexible Server."
+  default     = true
+}
+
+variable "active_directory_auth_enabled" {
+  type        = bool
+  description = "Whether Active Directory authentication is enabled for the PostgreSQL Flexible Server."
+  default     = true
+}
+
 variable "active_directory_administrator_groups" {
   type = set(object({
     object_id    = string
     display_name = string
   }))
   default = []
-}
-
-variable "administrator_username" {
-  type    = string
-  default = "sbp_administrator"
 }
 
 variable "backup_retention_days" {
@@ -48,7 +71,7 @@ variable "high_available" {
 
 variable "server_version" {
   type        = string
-  description = "The version of the postgresql server. "
+  description = "The version of the postgresql server."
   default     = "17"
 }
 
@@ -81,29 +104,6 @@ variable "public_network_access_enabled" {
   default     = false
 }
 
-variable "password_auth_enabled" {
-  type        = bool
-  description = "Whether password authentication is enabled for the PostgreSQL Flexible Server."
-  default     = true
-}
-
-variable "administrator_ephemeral_password" {
-  default   = null
-  ephemeral = true
-  type      = string
-}
-
-variable "administrator_ephemeral_password_version" {
-  default = null
-  type    = number
-}
-
-variable "active_directory_auth_enabled" {
-  type        = bool
-  description = "Whether Active Directory authentication is enabled for the PostgreSQL Flexible Server."
-  default     = true
-}
-
 variable "identity_type" {
   type        = string
   description = "The type of identity to use for the PostgreSQL Flexible Server. Possible values are 'UserAssigned' or 'SystemAssigned'."
@@ -134,29 +134,44 @@ variable "databases" {
     collation              = optional(string, "en_US.utf8")
     administrator_username = optional(string)
 
-    local_owner_account = optional(object({
+    local_readers = optional(set(object({
       username          = string
       generate_password = optional(bool, true)
-    }))
+      ephemeral_password_version = optional(number)
+    })), [])
+
+
+    local_writers = optional(set(object({
+      username          = string
+      generate_password = optional(bool, true)
+      ephemeral_password_version = optional(number)
+    })), [])
+
+    local_admins = optional(set(object({
+      username          = string
+      generate_password = optional(bool, true)
+      ephemeral_password_version = optional(number)
+    })), [])
 
     readers = optional(set(object({
       object_id    = string
       display_name = string
       role_prefix  = optional(string)
-    })))
+    })), [])
 
     writers = optional(set(object({
       object_id    = string
       display_name = string
       role_prefix  = optional(string)
-    })))
+    })), [])
 
     admins = optional(set(object({
       object_id    = string
       display_name = string
       role_prefix  = optional(string)
-    })))
+    })), [])
   }))
+
   default     = {}
   description = <<-DOC
     A map of databases to create on the PostgreSQL Flexible Server. The map key is used as the database name.
@@ -198,3 +213,22 @@ variable "databases" {
       - `generate_password` - (Optional) Whether to auto-generate a password. Defaults to `true`. Set to `false` if password will be managed outside of Terraform.
   DOC
 }
+
+variable "local_readers_ephemeral_passwords" {
+  type      = map(string)
+  ephemeral = true
+  default   = null
+}
+
+variable "local_writers_ephemeral_passwords" {
+  type      = map(string)
+  ephemeral = true
+  default   = null
+}
+
+variable "local_admins_ephemeral_passwords" {
+  type      = map(string)
+  ephemeral = true
+  default   = null
+}
+

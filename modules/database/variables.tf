@@ -26,7 +26,6 @@ variable "readers" {
     display_name = string
     role_prefix  = optional(string)
   }))
-  default = []
 }
 
 variable "writers" {
@@ -35,7 +34,6 @@ variable "writers" {
     display_name = string
     role_prefix  = optional(string)
   }))
-  default = []
 }
 
 variable "admins" {
@@ -44,19 +42,47 @@ variable "admins" {
     display_name = string
     role_prefix  = optional(string)
   }))
-  default = []
 }
 
-variable "postgresql_server_administrator_username" {
-  type    = string
-  default = null
+variable "local_readers" {
+  type = set(object({
+    username                   = string
+    generate_password          = bool
+    ephemeral_password_version = optional(number)
+  }))
 }
 
-variable "local_owner_account" {
-  type = object({
-    username          = string
-    generate_password = optional(bool, true)
-  })
-  description = "Local PostgreSQL account with owner access for applications that do not support AD authentication. Set generate_password to false if password will be managed outside of Terraform."
-  default     = null
+variable "local_writers" {
+  type = set(object({
+    username                   = string
+    generate_password          = bool
+    ephemeral_password_version = optional(number)
+  }))
 }
+
+variable "local_admins" {
+  type = set(object({
+    username                   = string
+    generate_password          = bool
+    ephemeral_password_version = optional(number)
+  }))
+}
+
+variable "local_readers_ephemeral_passwords" {
+  type      = map(string)
+  ephemeral = true
+  default   = null
+}
+
+variable "local_writers_ephemeral_passwords" {
+  type      = map(string)
+  ephemeral = true
+  default   = null
+}
+
+variable "local_admins_ephemeral_passwords" {
+  type      = map(string)
+  ephemeral = true
+  default   = null
+}
+

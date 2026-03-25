@@ -1,5 +1,5 @@
 resource "postgresql_role" "this" {
-  name  = "${var.role_assignment.role_prefix != null ? var.role_assignment.role_prefix : var.role_assignment.display_name}_${var.role_name}"
+  name  = var.role_assignment.role_prefix != null ? "${var.role_assignment.role_prefix}-db-${var.role_name}" : var.role_assignment.display_name
   login = true
   roles = var.roles
 }
@@ -11,7 +11,9 @@ resource "postgresql_security_label" "this" {
   label          = "aadauth,oid=${var.role_assignment.object_id},type=group"
 }
 
-resource "postgresql_default_privileges" "future_table_rights_own_role" {
+resource "postgresql_default_privileges" "future_table_rights_owner_role" {
+  count = var.is_admin ? 1 : 0
+
   database    = var.database_name
   schema      = "public"
   owner       = postgresql_role.this.name
