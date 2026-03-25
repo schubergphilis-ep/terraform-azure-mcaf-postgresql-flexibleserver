@@ -6,7 +6,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
   resource_group_name = var.resource_group_name
 
   administrator_login               = var.password_auth_enabled ? var.administrator_username : null
-  administrator_password            = var.password_auth_enabled && var.administrator_ephemeral_password_version == null ? random_password.password.result : null
+  administrator_password            = var.password_auth_enabled && var.administrator_ephemeral_password_version == null ? random_password.password[0].result : null
   administrator_password_wo         = var.administrator_ephemeral_password
   administrator_password_wo_version = var.administrator_ephemeral_password_version
   backup_retention_days             = var.backup_retention_days
@@ -53,19 +53,20 @@ resource "azurerm_postgresql_flexible_server" "this" {
 }
 
 resource "random_password" "password" {
+  count            = var.password_auth_enabled && var.administrator_ephemeral_password_version == null ? 1 : 0
   length           = 48
   special          = true
   override_special = "!#$&()-_=+[]{}?"
 }
 
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "this" {
-  for_each = var.active_directory_administrator_groups
+  for_each = { for group_object in var.active_directory_administrator_groups : group_object.display_name => group_object }
 
   server_name         = azurerm_postgresql_flexible_server.this.name
   resource_group_name = var.resource_group_name
   tenant_id           = data.azurerm_client_config.current.tenant_id
   object_id           = each.value.object_id
-  principal_name      = each.value.display_name
+  principal_name      = each.key
   principal_type      = "Group"
 }
 
@@ -74,11 +75,22 @@ module "database" {
 
   source = "./modules/database"
 
-  postgresql_server_id                     = azurerm_postgresql_flexible_server.this.id
-  name                                     = each.key
-  charset                                  = each.value.charset
-  collation                                = each.value.collation
-  postgresql_server_administrator_username = var.password_auth_enabled ? coalesce(each.value.administrator_username, var.administrator_username) : null
+  postgresql_server_id = azurerm_postgresql_flexible_server.this.id
+  name                 = each.key
+  charset              = each.value.charset
+  collation            = each.value.collation
 
-  local_owner_account = each.value.local_owner_account
+  readers                           = each.value.readers
+  local_readers                     = each.value.local_readers
+  local_readers_ephemeral_passwords = var.local_readers_ephemeral_passwords
+
+  writers                           = each.value.writers
+  local_writers                     = each.value.local_writers
+  local_writers_ephemeral_passwords = var.local_writers_ephemeral_passwords
+
+  admins                           = each.value.admins
+  local_admins                     = each.value.local_admins
+  local_admins_ephemeral_passwords = var.local_admins_ephemeral_passwords
+
+  depends_on = [azurerm_postgresql_flexible_server_active_directory_administrator.this]
 }
