@@ -46,7 +46,7 @@ module "local_admin" {
 
 module "entra_rbac_reader" {
   source          = "../rbac_entra"
-  for_each        = { for user_object in var.readers : user_object.display_name => user_object }
+  for_each        = { for user_object in var.readers : coalesce(user_object.object_id, user_object.principal_id) => user_object }
   database_name   = azurerm_postgresql_flexible_server_database.this.name
   role_name       = "readers"
   role_assignment = each.value
@@ -57,7 +57,7 @@ module "entra_rbac_reader" {
 
 module "entra_rbac_writer" {
   source          = "../rbac_entra"
-  for_each        = { for user_object in var.writers : user_object.display_name => user_object }
+  for_each        = { for user_object in var.writers : coalesce(user_object.object_id, user_object.principal_id) => user_object }
   database_name   = azurerm_postgresql_flexible_server_database.this.name
   role_name       = "writers"
   role_assignment = each.value
@@ -68,7 +68,7 @@ module "entra_rbac_writer" {
 
 module "entra_rbac_admin" {
   source          = "../rbac_entra"
-  for_each        = { for user_object in var.admins : user_object.display_name => user_object }
+  for_each        = { for user_object in var.admins : coalesce(user_object.object_id, user_object.principal_id) => user_object }
   database_name   = azurerm_postgresql_flexible_server_database.this.name
   role_name       = "admins"
   role_assignment = each.value

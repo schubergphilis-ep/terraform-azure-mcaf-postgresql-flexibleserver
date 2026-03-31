@@ -19,6 +19,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
   geo_redundant_backup_enabled      = var.geo_redundant_backup_enabled
   version                           = var.server_version
   zone                              = var.high_available ? "1" : null
+  tags                              = var.tags
 
   authentication {
     password_auth_enabled         = var.password_auth_enabled

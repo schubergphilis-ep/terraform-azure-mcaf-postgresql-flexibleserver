@@ -9,11 +9,11 @@ variable "generate_password" {
 variable "ephemeral_password" {
   type      = string
   ephemeral = true
-  default = null
+  default   = null
 }
 
 variable "ephemeral_password_version" {
-  type    = number
+  type = number
 }
 
 variable "roles" {
