@@ -1,5 +1,5 @@
 resource "postgresql_role" "this" {
-  name  = var.role_assignment.role_prefix != null ? "${var.role_assignment.role_prefix}-db-${var.role_name}" : var.role_assignment.display_name
+  name  = var.role_assignment.role_prefix != null ? "${var.role_assignment.role_prefix}-db-${var.role_name}" : coalesce(var.role_assignment.display_name, var.role_assignment.name)
   login = true
   roles = var.roles
 }
@@ -8,7 +8,7 @@ resource "postgresql_security_label" "this" {
   object_type    = "role"
   object_name    = postgresql_role.this.name
   label_provider = "pgaadauth"
-  label          = "aadauth,oid=${var.role_assignment.object_id},type=group"
+  label          = "aadauth,oid=${coalesce(var.role_assignment.object_id, var.role_assignment.principal_id)},type=${var.role_assignment.object_id != null ? "group" : "service"}"
 }
 
 resource "postgresql_default_privileges" "future_table_rights_owner_role" {
