@@ -21,8 +21,10 @@ variable "is_admin" {
 
 variable "role_assignment" {
   type = object({
-    object_id    = string
-    display_name = string
+    object_id    = optional(string)
+    name         = optional(string)
+    display_name = optional(string)
+    principal_id = optional(string)
     role_prefix  = optional(string)
   })
 }

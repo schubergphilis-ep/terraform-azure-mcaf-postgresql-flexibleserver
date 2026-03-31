@@ -128,6 +128,11 @@ variable "geo_redundant_backup_enabled" {
   default     = true
 }
 
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
 variable "databases" {
   type = map(object({
     charset                = optional(string, "UTF8")
@@ -135,39 +140,48 @@ variable "databases" {
     administrator_username = optional(string)
 
     local_readers = optional(set(object({
-      username          = string
-      generate_password = optional(bool, true)
+      username                   = string
+      generate_password          = optional(bool, true)
       ephemeral_password_version = optional(number)
     })), [])
 
 
     local_writers = optional(set(object({
-      username          = string
-      generate_password = optional(bool, true)
+      username                   = string
+      generate_password          = optional(bool, true)
       ephemeral_password_version = optional(number)
     })), [])
 
     local_admins = optional(set(object({
-      username          = string
-      generate_password = optional(bool, true)
+      username                   = string
+      generate_password          = optional(bool, true)
       ephemeral_password_version = optional(number)
     })), [])
 
     readers = optional(set(object({
-      object_id    = string
-      display_name = string
+      object_id    = optional(string)
+      name         = optional(string)
+      display_name = optional(string)
+      principal_id = optional(string)
+      client_id    = optional(string)
       role_prefix  = optional(string)
     })), [])
 
     writers = optional(set(object({
-      object_id    = string
-      display_name = string
+      object_id    = optional(string)
+      name         = optional(string)
+      display_name = optional(string)
+      principal_id = optional(string)
+      client_id    = optional(string)
       role_prefix  = optional(string)
     })), [])
 
     admins = optional(set(object({
-      object_id    = string
-      display_name = string
+      object_id    = optional(string)
+      name         = optional(string)
+      display_name = optional(string)
+      principal_id = optional(string)
+      client_id    = optional(string)
       role_prefix  = optional(string)
     })), [])
   }))

@@ -22,24 +22,33 @@ variable "postgresql_server_id" {
 
 variable "readers" {
   type = set(object({
-    object_id    = string
-    display_name = string
+    object_id    = optional(string)
+    name         = optional(string)
+    display_name = optional(string)
+    principal_id = optional(string)
+    client_id    = optional(string)
     role_prefix  = optional(string)
   }))
 }
 
 variable "writers" {
   type = set(object({
-    object_id    = string
-    display_name = string
+    object_id    = optional(string)
+    name         = optional(string)
+    display_name = optional(string)
+    principal_id = optional(string)
+    client_id    = optional(string)
     role_prefix  = optional(string)
   }))
 }
 
 variable "admins" {
   type = set(object({
-    object_id    = string
-    display_name = string
+    object_id    = optional(string)
+    name         = optional(string)
+    display_name = optional(string)
+    principal_id = optional(string)
+    client_id    = optional(string)
     role_prefix  = optional(string)
   }))
 }
