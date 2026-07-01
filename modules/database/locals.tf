@@ -71,6 +71,14 @@ locals {
     }
   )
 
-  create_local_owner    = var.local_owner_account != null
-  generate_owner_password = local.create_local_owner && var.local_owner_account.generate_password
+  create_local_owner       = var.local_owner_account != null
+  local_owner_is_federated = local.create_local_owner && var.local_owner_account.object_id != null
+  generate_owner_password  = local.create_local_owner && !local.local_owner_is_federated && var.local_owner_account.generate_password
+
+  # Map Entra principal types to the token expected by the pgaadauth security label provider.
+  pgaadauth_type = {
+    ServicePrincipal = "service"
+    Group            = "group"
+    User             = "user"
+  }
 }

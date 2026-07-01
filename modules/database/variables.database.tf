@@ -71,15 +71,40 @@ variable "admin_identity_object_ids" {
   default = []
 }
 
-variable "postgresql_server_administrator_username" {
-  type = string
+variable "provisioning_identity_name" {
+  type        = string
+  description = "The PostgreSQL login name that Terraform authenticates as when provisioning roles and privileges. In password mode this is the server administrator username; in Entra-only mode set it to the Entra principal name Terraform connects as, so object-owner default privileges are attributed to the correct owner."
 }
 
 variable "local_owner_account" {
   type = object({
     username          = string
     generate_password = optional(bool, true)
+    object_id         = optional(string)
+    principal_type    = optional(string, "ServicePrincipal")
   })
-  description = "Local PostgreSQL account with owner access for applications that do not support AD authentication. Set generate_password to false if password will be managed outside of Terraform."
+  description = <<-DOC
+    PostgreSQL account with owner access to the database, for applications that manage their own schema.
+
+    Authentication mode is selected by whether `object_id` is set:
+    - Password mode (default, `object_id` omitted): a local PostgreSQL role is created with a password.
+      Set `generate_password` to `false` to manage the password outside of Terraform.
+    - Federated mode (`object_id` set): the role is created for Entra ID (Azure AD) token logon via a
+      `pgaadauth` security label and has no password. `generate_password` is ignored. The Entra identity
+      itself is NOT created by this module; supply the `object_id` of a caller-managed managed identity,
+      service principal, or group.
+
+    - `username`          - (Required) The name of the PostgreSQL owner role.
+    - `generate_password` - (Optional) Password mode only. Auto-generate a password. Defaults to `true`.
+    - `object_id`         - (Optional) Entra ID object ID of the identity to federate. Enables federated mode.
+    - `principal_type`    - (Optional) Entra principal type: `ServicePrincipal`, `Group`, or `User`. Defaults to `ServicePrincipal`.
+  DOC
   default     = null
+
+  validation {
+    condition = var.local_owner_account == null ? true : contains(
+      ["ServicePrincipal", "Group", "User"], var.local_owner_account.principal_type
+    )
+    error_message = "local_owner_account.principal_type must be one of: ServicePrincipal, Group, User."
+  }
 }
