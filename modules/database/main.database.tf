@@ -81,7 +81,7 @@ resource "postgresql_default_privileges" "future_table_rights_admin_account" {
 
   database    = azurerm_postgresql_flexible_server_database.this.name
   schema      = "public"
-  owner       = var.postgresql_server_administrator_username
+  owner       = var.provisioning_identity_name
   object_type = "table"
   privileges  = ["ALL"]
   role        = postgresql_role.admin[each.key].name
@@ -123,7 +123,8 @@ resource "postgresql_security_label" "admin" {
   depends_on = [azurerm_postgresql_flexible_server_database.this]
 }
 
-# Local owner account for applications that do not support AD authentication
+# Owner account for applications that manage their own schema.
+# Password mode by default; federated (Entra ID) logon when local_owner_account.object_id is set.
 resource "random_password" "local_owner" {
   count = local.generate_owner_password ? 1 : 0
 
@@ -146,6 +147,19 @@ resource "postgresql_role" "local_owner" {
   create_role     = false
   inherit         = true
   replication     = false
+
+  depends_on = [azurerm_postgresql_flexible_server_database.this]
+}
+
+# Federated (Entra ID) logon for the owner account. Only created when object_id is supplied.
+resource "postgresql_security_label" "local_owner" {
+  provider = postgresql.database
+  count    = local.local_owner_is_federated ? 1 : 0
+
+  object_type    = "role"
+  object_name    = postgresql_role.local_owner[0].name
+  label_provider = "pgaadauth"
+  label          = "aadauth,oid=${var.local_owner_account.object_id},type=${local.pgaadauth_type[var.local_owner_account.principal_type]}"
 
   depends_on = [azurerm_postgresql_flexible_server_database.this]
 }
@@ -223,7 +237,7 @@ resource "postgresql_default_privileges" "local_owner_future_table_rights_admin_
 
   database    = azurerm_postgresql_flexible_server_database.this.name
   schema      = "public"
-  owner       = var.postgresql_server_administrator_username
+  owner       = var.provisioning_identity_name
   object_type = "table"
   privileges  = ["ALL"]
   role        = postgresql_role.local_owner[0].name
@@ -247,7 +261,7 @@ resource "postgresql_default_privileges" "local_owner_future_sequence_rights_adm
 
   database    = azurerm_postgresql_flexible_server_database.this.name
   schema      = "public"
-  owner       = var.postgresql_server_administrator_username
+  owner       = var.provisioning_identity_name
   object_type = "sequence"
   privileges  = ["ALL"]
   role        = postgresql_role.local_owner[0].name
@@ -271,9 +285,8 @@ resource "postgresql_default_privileges" "local_owner_future_function_rights_adm
 
   database    = azurerm_postgresql_flexible_server_database.this.name
   schema      = "public"
-  owner       = var.postgresql_server_administrator_username
+  owner       = var.provisioning_identity_name
   object_type = "function"
   privileges  = ["ALL"]
   role        = postgresql_role.local_owner[0].name
 }
-

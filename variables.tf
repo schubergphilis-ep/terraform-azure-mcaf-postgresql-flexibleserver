@@ -23,6 +23,12 @@ variable "administrator_username" {
   default = "sbp_administrator"
 }
 
+variable "provisioning_identity_name" {
+  type        = string
+  description = "The PostgreSQL login name that the postgresql provider authenticates as when creating roles and privileges. Defaults to the server administrator username (password mode). When password authentication is disabled and the provider connects via Entra ID, set this to the Entra principal name Terraform runs as so that object-owner default privileges are attributed to the correct owner. Can be overridden per database via the database's administrator_username."
+  default     = null
+}
+
 variable "backup_retention_days" {
   type        = number
   description = "Number of days to keep the postgress backup, between 7 and 35"
@@ -135,6 +141,8 @@ variable "databases" {
     local_owner_account = optional(object({
       username          = string
       generate_password = optional(bool, true)
+      object_id         = optional(string)
+      principal_type    = optional(string, "ServicePrincipal")
     }))
 
     reader_groups = optional(list(object({
@@ -206,8 +214,10 @@ variable "databases" {
       - `principal_name` - (Required) The principal name of the managed identity.
       - `role_prefix`    - (Optional) A prefix for the database role name.
 
-    - `local_owner_account` - (Optional) A local PostgreSQL account with owner access for applications that do not support AD authentication.
-      - `username`          - (Required) The username for the local account.
-      - `generate_password` - (Optional) Whether to auto-generate a password. Defaults to `true`. Set to `false` if password will be managed outside of Terraform.
+    - `local_owner_account` - (Optional) A PostgreSQL account with owner access, for applications that manage their own schema. Authentication mode is selected by whether `object_id` is set: password mode (default) creates a role with a password; federated mode (`object_id` set) creates an Entra ID (Azure AD) role that logs on with a token and has no password. The Entra identity itself is not created by this module.
+      - `username`          - (Required) The name of the PostgreSQL owner role.
+      - `generate_password` - (Optional) Password mode only. Whether to auto-generate a password. Defaults to `true`. Set to `false` if the password is managed outside of Terraform.
+      - `object_id`         - (Optional) The Entra ID object ID of a caller-managed managed identity, service principal, or group. Setting this switches the owner account to federated (token) logon.
+      - `principal_type`    - (Optional) The Entra principal type: `ServicePrincipal`, `Group`, or `User`. Defaults to `ServicePrincipal`.
   DOC
 }

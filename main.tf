@@ -5,8 +5,8 @@ resource "azurerm_postgresql_flexible_server" "this" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  administrator_login           = var.administrator_username
-  administrator_password        = random_password.password.result
+  administrator_login           = var.password_auth_enabled ? var.administrator_username : null
+  administrator_password        = var.password_auth_enabled ? random_password.password[0].result : null
   backup_retention_days         = var.backup_retention_days
   create_mode                   = "Default" # TODO: support DR scenarios
   delegated_subnet_id           = var.delegated_subnet_id
@@ -51,6 +51,8 @@ resource "azurerm_postgresql_flexible_server" "this" {
 }
 
 resource "random_password" "password" {
+  count = var.password_auth_enabled ? 1 : 0
+
   length           = 48
   special          = true
   override_special = var.use_password_override_special ? "!#$&()-_=+[]{}?" : null
@@ -76,11 +78,11 @@ module "database" {
     postgresql.database = postgresql.database
   }
 
-  postgresql_server_id                     = azurerm_postgresql_flexible_server.this.id
-  name                                     = each.key
-  charset                                  = each.value.charset
-  collation                                = each.value.collation
-  postgresql_server_administrator_username = coalesce(each.value.administrator_username, var.administrator_username)
+  postgresql_server_id       = azurerm_postgresql_flexible_server.this.id
+  name                       = each.key
+  charset                    = each.value.charset
+  collation                  = each.value.collation
+  provisioning_identity_name = coalesce(each.value.administrator_username, var.provisioning_identity_name, var.administrator_username)
 
   reader_groups                      = each.value.reader_groups
   reader_managed_identity_object_ids = each.value.reader_managed_identity_object_ids

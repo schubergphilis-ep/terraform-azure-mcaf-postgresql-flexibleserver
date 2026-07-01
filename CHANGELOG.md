@@ -13,4 +13,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🚀 Features
 
 * add_geo_redundant backup ([#2](https://github.com/schubergphilis/terraform-azure-mcaf-postgresql-flexibleserver/pull/2)) ([4847fa4](https://github.com/schubergphilis-ep/terraform-azure-mcaf-postgresql-flexibleserver/commit/4847fa4f3fade452a9c2881386f093c4c8b643a7))
-
