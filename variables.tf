@@ -143,6 +143,7 @@ variable "databases" {
       generate_password = optional(bool, true)
       object_id         = optional(string)
       principal_type    = optional(string, "ServicePrincipal")
+      federated         = optional(bool)
     }))
 
     reader_groups = optional(list(object({

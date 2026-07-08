@@ -82,6 +82,7 @@ variable "local_owner_account" {
     generate_password = optional(bool, true)
     object_id         = optional(string)
     principal_type    = optional(string, "ServicePrincipal")
+    federated         = optional(bool)
   })
   description = <<-DOC
     PostgreSQL account with owner access to the database, for applications that manage their own schema.
@@ -98,6 +99,9 @@ variable "local_owner_account" {
     - `generate_password` - (Optional) Password mode only. Auto-generate a password. Defaults to `true`.
     - `object_id`         - (Optional) Entra ID object ID of the identity to federate. Enables federated mode.
     - `principal_type`    - (Optional) Entra principal type: `ServicePrincipal`, `Group`, or `User`. Defaults to `ServicePrincipal`.
+    - `federated`         - (Optional) Explicitly select federated mode. Set this (known at plan time) when the
+                            `object_id` is only known after apply, e.g. a managed identity created in the same run.
+                            When null, mode is inferred from whether `object_id` is set (upstream behaviour).
   DOC
   default     = null
 

@@ -21,14 +21,14 @@ data "azuread_group" "admin_groups" {
 
 locals {
   readers = merge(
-    { for group in var.reader_groups : data.azuread_group.reader_groups[group.group_name].object_id =>
+    { for group in var.reader_groups : "${group.role_prefix != null ? group.role_prefix : data.azuread_group.reader_groups[group.group_name].display_name}_group_reader" =>
       {
         role_name = "${group.role_prefix != null ? group.role_prefix : data.azuread_group.reader_groups[group.group_name].display_name}_group_reader"
         object_id = data.azuread_group.reader_groups[group.group_name].object_id
         type      = "group"
       }
     },
-    { for mid in var.reader_managed_identity_object_ids : mid.object_id =>
+    { for mid in var.reader_managed_identity_object_ids : "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_reader" =>
       {
         role_name = "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_reader"
         object_id = mid.object_id
@@ -38,14 +38,14 @@ locals {
   )
 
   writers = merge(
-    { for group in var.writer_groups : data.azuread_group.writer_groups[group.group_name].object_id =>
+    { for group in var.writer_groups : "${group.role_prefix != null ? group.role_prefix : data.azuread_group.writer_groups[group.group_name].display_name}_group_writer" =>
       {
         role_name = "${group.role_prefix != null ? group.role_prefix : data.azuread_group.writer_groups[group.group_name].display_name}_group_writer"
         object_id = data.azuread_group.writer_groups[group.group_name].object_id
         type      = "group"
       }
     },
-    { for mid in var.writer_managed_identity_object_ids : mid.object_id =>
+    { for mid in var.writer_managed_identity_object_ids : "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_writer" =>
       {
         role_name = "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_writer"
         object_id = mid.object_id
@@ -55,14 +55,14 @@ locals {
   )
 
   admins = merge(
-    { for group in var.admin_groups : data.azuread_group.admin_groups[group.group_name].object_id =>
+    { for group in var.admin_groups : "${group.role_prefix != null ? group.role_prefix : data.azuread_group.admin_groups[group.group_name].display_name}_group_admin" =>
       {
         role_name = "${group.role_prefix != null ? group.role_prefix : data.azuread_group.admin_groups[group.group_name].display_name}_group_admin"
         object_id = data.azuread_group.admin_groups[group.group_name].object_id
         type      = "group"
       }
     },
-    { for mid in var.admin_identity_object_ids : mid.object_id =>
+    { for mid in var.admin_identity_object_ids : "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_admin" =>
       {
         role_name = "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_admin"
         object_id = mid.object_id
@@ -71,9 +71,12 @@ locals {
     }
   )
 
-  create_local_owner       = var.local_owner_account != null
-  local_owner_is_federated = local.create_local_owner && var.local_owner_account.object_id != null
-  generate_owner_password  = local.create_local_owner && !local.local_owner_is_federated && var.local_owner_account.generate_password
+  create_local_owner = var.local_owner_account != null
+  local_owner_is_federated = local.create_local_owner && (
+    var.local_owner_account.federated != null ? var.local_owner_account.federated : var.local_owner_account.object_id != null
+  )
+  generate_owner_password = local.create_local_owner && !local.local_owner_is_federated && var.local_owner_account.generate_password
+
 
   # Map Entra principal types to the token expected by the pgaadauth security label provider.
   pgaadauth_type = {
