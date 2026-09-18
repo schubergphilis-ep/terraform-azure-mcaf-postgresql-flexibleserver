@@ -22,7 +22,6 @@ provider "azurerm" {
 }
 
 provider "postgresql" {
-  alias           = "database"
   host            = module.postgresql.fqdn
   port            = 5432
   username        = module.postgresql.administrator_username
@@ -91,10 +90,6 @@ data "azurerm_client_config" "current" {}
 module "postgresql" {
   source = "../../"
 
-  providers = {
-    postgresql.database = postgresql.database
-  }
-
   name                = "psql-example-no-ha"
   resource_group_name = azurerm_resource_group.example.name
   location            = azurerm_resource_group.example.location
@@ -104,7 +99,7 @@ module "postgresql" {
   storage_size          = 32
   server_version        = "14"
   backup_retention_days = 7
-  subnet_id             = azurerm_subnet.example.id
+  delegated_subnet_id   = azurerm_subnet.example.id
 
   # Disable high availability for cost savings
   high_available = false
