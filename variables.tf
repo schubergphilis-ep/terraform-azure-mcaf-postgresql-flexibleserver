@@ -191,41 +191,54 @@ variable "databases" {
     A map of databases to create on the PostgreSQL Flexible Server. The map key is used as the database name.
 
     Each database object supports the following properties:
-    - `charset`              - (Optional) The charset of the PostgreSQL database. Defaults to `UTF8`.
-    - `collation`            - (Optional) The collation of the PostgreSQL database. Defaults to `en_US.utf8`.
+    - `charset`                - (Optional) The charset of the PostgreSQL database. Defaults to `UTF8`.
+    - `collation`              - (Optional) The collation of the PostgreSQL database. Defaults to `en_US.utf8`.
     - `administrator_username` - (Optional) The administrator username for the PostgreSQL server. If not specified, the server's default administrator username is used.
 
-    - `reader_groups` - (Optional) A list of Entra ID groups to grant read access to the database.
-      - `group_name`  - (Required) The name of the Entra ID group.
-      - `role_prefix` - (Optional) A prefix for the database role name.
+    Entra ID principals are granted access through `readers`, `writers` and `admins`. Each entry
+    describes one principal, which may be a group, a service principal or a managed identity:
+      - `object_id`    - (Optional) The object ID of the group. Set this for groups.
+      - `principal_id` - (Optional) The principal ID of the service principal or managed identity.
+      - `display_name` - (Optional) The display name of the group.
+      - `name`         - (Optional) The name of the managed identity.
+      - `client_id`    - (Optional) The client ID of the managed identity.
+      - `role_prefix`  - (Optional) A prefix for the database role name. Without it the role takes the principal's display name or name.
 
-    - `reader_managed_identity_object_ids` - (Optional) A list of managed identities to grant read access to the database.
-      - `object_id`      - (Required) The object ID of the managed identity.
-      - `principal_name` - (Required) The principal name of the managed identity.
-      - `role_prefix`    - (Optional) A prefix for the database role name.
+    One of `object_id` or `principal_id` is required: the `pgaadauth` security label needs the
+    principal's Entra object ID. Supply `display_name` for groups or `name` for managed identities
+    as well, because the database role is named after it and the role name is what the principal
+    authenticates as.
 
-    - `writer_groups` - (Optional) A list of Entra ID groups to grant write access to the database.
-      - `group_name`  - (Required) The name of the Entra ID group.
-      - `role_prefix` - (Optional) A prefix for the database role name.
+    `readers` receive `pg_read_all_data`. `writers` additionally receive `pg_write_all_data`.
+    `admins` receive both, plus `USAGE` and `CREATE` on the `public` schema, `ALL` on its tables,
+    and matching default privileges — use `admins` for a principal that creates its own schema.
 
-    - `writer_managed_identity_object_ids` - (Optional) A list of managed identities to grant write access to the database.
-      - `object_id`      - (Required) The object ID of the managed identity.
-      - `principal_name` - (Required) The principal name of the managed identity.
-      - `role_prefix`    - (Optional) A prefix for the database role name.
-
-    - `admin_groups` - (Optional) A list of Entra ID groups to grant admin access to the database.
-      - `group_name`  - (Required) The name of the Entra ID group.
-      - `role_prefix` - (Optional) A prefix for the database role name.
-
-    - `admin_identity_object_ids` - (Optional) A list of managed identities to grant admin access to the database.
-      - `object_id`      - (Required) The object ID of the managed identity.
-      - `principal_name` - (Required) The principal name of the managed identity.
-      - `role_prefix`    - (Optional) A prefix for the database role name.
-
-    - `local_owner_account` - (Optional) A local PostgreSQL account with owner access for applications that do not support AD authentication.
-      - `username`          - (Required) The username for the local account.
-      - `generate_password` - (Optional) Whether to auto-generate a password. Defaults to `true`. Set to `false` if password will be managed outside of Terraform.
+    Local PostgreSQL accounts, for applications that cannot use Entra ID authentication, are
+    declared through `local_readers`, `local_writers` and `local_admins`:
+      - `username`                   - (Required) The username for the local account.
+      - `generate_password`          - (Optional) Whether to generate a password. Defaults to `true`.
+      - `ephemeral_password_version` - (Optional) Version marker used when the password is supplied through the corresponding `local_*_ephemeral_passwords` variable.
   DOC
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for principal in setunion(db.readers, db.writers, db.admins) :
+        principal.object_id != null || principal.principal_id != null
+      ])
+    ])
+    error_message = "Each reader, writer and admin must set object_id (for a group) or principal_id (for a service principal or managed identity). The pgaadauth security label cannot be written without the principal's Entra object ID."
+  }
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for principal in setunion(db.readers, db.writers, db.admins) :
+        principal.display_name != null || principal.name != null || principal.role_prefix != null
+      ])
+    ])
+    error_message = "Each reader, writer and admin must set display_name, name or role_prefix. The database role is named after one of these, and the name must be known at plan time because it identifies the role."
+  }
 }
 
 variable "local_readers_ephemeral_passwords" {
