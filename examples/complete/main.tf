@@ -14,6 +14,10 @@ terraform {
       source  = "cyrilgdn/postgresql"
       version = ">= 1.25.0"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = ">= 3.0"
+    }
   }
 }
 
@@ -22,7 +26,6 @@ provider "azurerm" {
 }
 
 provider "postgresql" {
-  alias           = "database"
   host            = module.postgresql.fqdn
   port            = 5432
   username        = module.postgresql.administrator_username
@@ -94,12 +97,25 @@ resource "azurerm_key_vault_key" "example" {
 
 data "azurerm_client_config" "current" {}
 
+# The module takes group object ids and display names rather than group names, so the
+# caller resolves them. This keeps the module free of directory lookups and lets a caller
+# pass groups it creates itself.
+data "azuread_group" "example" {
+  for_each = toset([
+    "PostgreSQL-Admins",
+    "Database-Admins",
+    "Data-Analysts",
+    "Data-Engineers",
+    "Developers",
+    "BI-Team",
+  ])
+
+  display_name     = each.value
+  security_enabled = true
+}
+
 module "postgresql" {
   source = "../../"
-
-  providers = {
-    postgresql.database = postgresql.database
-  }
 
   name                = "psql-example-complete"
   resource_group_name = azurerm_resource_group.example.name
@@ -110,7 +126,7 @@ module "postgresql" {
   storage_size          = 128
   server_version        = "15"
   backup_retention_days = 14
-  subnet_id             = azurerm_subnet.example.id
+  delegated_subnet_id   = azurerm_subnet.example.id
 
   # High availability configuration
   high_available                 = true
@@ -132,7 +148,10 @@ module "postgresql" {
 
   # Active Directory administrator groups
   active_directory_administrator_groups = [
-    "PostgreSQL-Admins"
+    {
+      object_id    = data.azuread_group.example["PostgreSQL-Admins"].object_id
+      display_name = data.azuread_group.example["PostgreSQL-Admins"].display_name
+    }
   ]
 
   # Databases with role-based access control
@@ -141,30 +160,38 @@ module "postgresql" {
       charset   = "UTF8"
       collation = "en_US.utf8"
 
-      # Local account for applications that do not support AD authentication
-      local_owner_account = {
-        username = "app_production_owner"
-      }
-
-      admin_groups = [
+      # Local account for applications that cannot use Entra ID authentication.
+      # A password is generated unless generate_password is set to false.
+      local_admins = [
         {
-          group_name  = "Database-Admins"
-          role_prefix = "admin"
+          username = "app_production_owner"
         }
       ]
 
-      writer_managed_identity_object_ids = [
+      admins = [
         {
-          object_id      = azurerm_user_assigned_identity.app.principal_id
-          principal_name = azurerm_user_assigned_identity.app.name
-          role_prefix    = "app"
+          object_id    = data.azuread_group.example["Database-Admins"].object_id
+          display_name = data.azuread_group.example["Database-Admins"].display_name
+          role_prefix  = "admin"
         }
       ]
 
-      reader_groups = [
+      # A managed identity is passed by name and principal id. The name is a configured
+      # argument, so it is known at plan time and is what the role is keyed on.
+      writers = [
         {
-          group_name  = "Data-Analysts"
-          role_prefix = "analyst"
+          name         = azurerm_user_assigned_identity.app.name
+          principal_id = azurerm_user_assigned_identity.app.principal_id
+          client_id    = azurerm_user_assigned_identity.app.client_id
+          role_prefix  = "app"
+        }
+      ]
+
+      readers = [
+        {
+          object_id    = data.azuread_group.example["Data-Analysts"].object_id
+          display_name = data.azuread_group.example["Data-Analysts"].display_name
+          role_prefix  = "analyst"
         }
       ]
     }
@@ -173,10 +200,11 @@ module "postgresql" {
       charset   = "UTF8"
       collation = "en_US.utf8"
 
-      writer_groups = [
+      writers = [
         {
-          group_name  = "Developers"
-          role_prefix = "dev"
+          object_id    = data.azuread_group.example["Developers"].object_id
+          display_name = data.azuread_group.example["Developers"].display_name
+          role_prefix  = "dev"
         }
       ]
     }
@@ -185,21 +213,24 @@ module "postgresql" {
       charset   = "UTF8"
       collation = "en_US.utf8"
 
-      reader_groups = [
+      readers = [
         {
-          group_name  = "Data-Analysts"
-          role_prefix = "analyst"
+          object_id    = data.azuread_group.example["Data-Analysts"].object_id
+          display_name = data.azuread_group.example["Data-Analysts"].display_name
+          role_prefix  = "analyst"
         },
         {
-          group_name  = "BI-Team"
-          role_prefix = "bi"
+          object_id    = data.azuread_group.example["BI-Team"].object_id
+          display_name = data.azuread_group.example["BI-Team"].display_name
+          role_prefix  = "bi"
         }
       ]
 
-      admin_groups = [
+      admins = [
         {
-          group_name  = "Data-Engineers"
-          role_prefix = "engineer"
+          object_id    = data.azuread_group.example["Data-Engineers"].object_id
+          display_name = data.azuread_group.example["Data-Engineers"].display_name
+          role_prefix  = "engineer"
         }
       ]
     }
