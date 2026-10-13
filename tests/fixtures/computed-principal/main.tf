@@ -1,11 +1,4 @@
-# Fixture for tests/entra_rbac_keys.tftest.hcl.
-#
-# Creates the managed identity in the SAME plan as the module call, so its principal_id is
-# unknown at plan time. That is the condition that broke the Entra RBAC for_each: keys must
-# be derivable from configuration, and principal_id is a computed attribute.
-#
-# Do not replace this with a value passed in from a previous run block — an applied output is
-# a known value and would no longer reproduce the failure.
+# principal_id must stay unknown at plan; don't pass it in from a previous run.
 
 terraform {
   required_version = ">= 1.12.0"
@@ -73,7 +66,6 @@ module "postgresql" {
 
   databases = {
     "app" = {
-      # name is a configured argument and therefore known at plan time; principal_id is not.
       writers = [
         {
           name         = azurerm_user_assigned_identity.app.name
