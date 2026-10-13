@@ -1,22 +1,11 @@
-# Guards the Entra RBAC for_each keys.
-#
-# modules/database keys its reader/writer/admin for_each maps on a value derived from each
-# principal. Those keys become resource addresses, so Terraform requires them to be known at
-# plan time. Keying on object_id/principal_id broke that: both are computed, so any caller
-# passing a principal created in the same apply failed with "Invalid for_each argument" and
-# nothing was applied at all.
-#
-# terraform validate cannot catch this — it does not evaluate for_each. A plan is required,
-# which is what these runs do. Mock providers are enough: computed attributes stay unknown
-# under mocks, so the failure still reproduces.
+# Entra RBAC for_each keys must be known at plan time.
 
 mock_provider "azurerm" {}
 mock_provider "azuread" {}
 mock_provider "random" {}
 mock_provider "postgresql" {}
 
-# Mock providers invent values for computed attributes, and the invented tenant_id is not a
-# UUID, which the azurerm provider rejects. Pin it.
+# azurerm rejects the mock's non-UUID tenant_id.
 override_data {
   target = data.azurerm_client_config.current
   values = {
@@ -37,8 +26,6 @@ variables {
   }
 }
 
-# A managed identity is identified by name (known at plan) plus principal_id (computed, used
-# only for the security label). Before the fix the key came from principal_id and this failed.
 run "managed_identity_keyed_on_name" {
   command = plan
 
@@ -56,7 +43,6 @@ run "managed_identity_keyed_on_name" {
   }
 }
 
-# Groups are identified by display_name; readers, writers and admins must all key cleanly.
 run "all_three_role_types" {
   command = plan
 
@@ -71,9 +57,6 @@ run "all_three_role_types" {
   }
 }
 
-# The regression that motivated the fix: the principal is created in the same plan, so its
-# principal_id is unknown. Runs against a fixture because the unknown value has to originate
-# inside the plan under test.
 run "principal_created_in_same_plan" {
   command = plan
 
@@ -81,7 +64,6 @@ run "principal_created_in_same_plan" {
     source = "./tests/fixtures/computed-principal"
   }
 
-  # The module under test is nested one level down in this fixture.
   override_data {
     target = module.postgresql.data.azurerm_client_config.current
     values = {

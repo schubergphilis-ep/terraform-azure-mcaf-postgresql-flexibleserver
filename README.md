@@ -89,7 +89,7 @@ If you want to learn more about creating good readme files then refer the follow
 |------|-------------|
 | <a name="output_administrator_password"></a> [administrator\_password](#output\_administrator\_password) | n/a |
 | <a name="output_administrator_username"></a> [administrator\_username](#output\_administrator\_username) | n/a |
-| <a name="output_databases"></a> [databases](#output\_databases) | Map of database names to their details including local owner account credentials. |
+| <a name="output_databases"></a> [databases](#output\_databases) | Map of database names to their id and name. |
 | <a name="output_fqdn"></a> [fqdn](#output\_fqdn) | n/a |
 | <a name="output_id"></a> [id](#output\_id) | n/a |
 <!-- END_TF_DOCS -->

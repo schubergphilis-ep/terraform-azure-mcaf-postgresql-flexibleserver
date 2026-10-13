@@ -1,10 +1,7 @@
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_postgresql_flexible_server" "this" {
-  # checkov:skip=CKV2_AZURE_57: Private connectivity is the caller's decision. This module takes
-  # delegated_subnet_id and private_dns_zone_id for VNet integration, and defaults
-  # public_network_access_enabled to false; callers needing a private endpoint attach one to the
-  # server id this module outputs. A graph check scoped to this repository cannot see it.
+  # checkov:skip=CKV2_AZURE_57: private endpoints are left to the caller
   name                = var.name
   location            = var.location
   resource_group_name = var.resource_group_name

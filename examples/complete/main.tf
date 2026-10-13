@@ -97,9 +97,7 @@ resource "azurerm_key_vault_key" "example" {
 
 data "azurerm_client_config" "current" {}
 
-# The module takes group object ids and display names rather than group names, so the
-# caller resolves them. This keeps the module free of directory lookups and lets a caller
-# pass groups it creates itself.
+# The module takes group objects, so the caller does the directory lookup.
 data "azuread_group" "example" {
   for_each = toset([
     "PostgreSQL-Admins",
@@ -160,8 +158,6 @@ module "postgresql" {
       charset   = "UTF8"
       collation = "en_US.utf8"
 
-      # Local account for applications that cannot use Entra ID authentication.
-      # A password is generated unless generate_password is set to false.
       local_admins = [
         {
           username = "app_production_owner"
@@ -176,8 +172,6 @@ module "postgresql" {
         }
       ]
 
-      # A managed identity is passed by name and principal id. The name is a configured
-      # argument, so it is known at plan time and is what the role is keyed on.
       writers = [
         {
           name         = azurerm_user_assigned_identity.app.name
