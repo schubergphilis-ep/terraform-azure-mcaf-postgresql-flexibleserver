@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0](https://github.com/schubergphilis-ep/terraform-azure-mcaf-postgresql-flexibleserver/compare/v0.1.0...v0.2.0) (2026-11-17)
+
+
+### 🚀 Features
+
+* Add support for specifying a maintenance window ([#4](https://github.com/schubergphilis-ep/terraform-azure-mcaf-postgresql-flexibleserver/issues/4)) ([3b80c2a](https://github.com/schubergphilis-ep/terraform-azure-mcaf-postgresql-flexibleserver/commit/3b80c2a3f9bdf6fc58ef859daf7ea030b438bcb1))
+
 ## 0.1.0 (2026-05-11)
 
 
 ### 🚀 Features
 
 * add_geo_redundant backup ([#2](https://github.com/schubergphilis/terraform-azure-mcaf-postgresql-flexibleserver/pull/2)) ([4847fa4](https://github.com/schubergphilis-ep/terraform-azure-mcaf-postgresql-flexibleserver/commit/4847fa4f3fade452a9c2881386f093c4c8b643a7))
-
