@@ -42,6 +42,15 @@ resource "azurerm_postgresql_flexible_server" "this" {
     }
   }
 
+  dynamic "maintenance_window" {
+    for_each = var.maintenance_window != null ? [var.maintenance_window] : []
+    content {
+      day_of_week  = maintenance_window.value.day_of_week
+      start_hour   = maintenance_window.value.start_hour
+      start_minute = maintenance_window.value.start_minute
+    }
+  }
+
   lifecycle {
     ignore_changes = [
       zone,

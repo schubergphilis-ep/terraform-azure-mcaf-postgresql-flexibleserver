@@ -98,9 +98,9 @@ module "postgresql" {
   resource_group_name = azurerm_resource_group.example.name
   location            = azurerm_resource_group.example.location
 
-  sku          = "GP_Standard_D2s_v3"
-  storage_size = 32
-  subnet_id    = azurerm_subnet.example.id
+  sku                 = "GP_Standard_D2s_v3"
+  storage_size        = 32
+  delegated_subnet_id = azurerm_subnet.example.id
 
   customer_managed_key = {
     key_vault_key_id                  = azurerm_key_vault_key.example.id
