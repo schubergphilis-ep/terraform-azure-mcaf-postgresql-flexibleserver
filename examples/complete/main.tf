@@ -110,12 +110,19 @@ module "postgresql" {
   storage_size          = 128
   server_version        = "15"
   backup_retention_days = 14
-  subnet_id             = azurerm_subnet.example.id
+  delegated_subnet_id   = azurerm_subnet.example.id
 
   # High availability configuration
   high_available                 = true
   high_availability_mode         = "ZoneRedundant"
   high_availability_standby_zone = "2"
+
+  # Maintenance window configuration (Saturday 02:30 UTC)
+  maintenance_window = {
+    day_of_week  = 6
+    start_hour   = 2
+    start_minute = 30
+  }
 
   # Authentication configuration
   password_auth_enabled         = true

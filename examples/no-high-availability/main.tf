@@ -104,7 +104,7 @@ module "postgresql" {
   storage_size          = 32
   server_version        = "14"
   backup_retention_days = 7
-  subnet_id             = azurerm_subnet.example.id
+  delegated_subnet_id   = azurerm_subnet.example.id
 
   # Disable high availability for cost savings
   high_available = false
