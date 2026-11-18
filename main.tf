@@ -5,8 +5,8 @@ resource "azurerm_postgresql_flexible_server" "this" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  administrator_login           = var.password_auth_enabled ? var.administrator_username : null
-  administrator_password        = var.password_auth_enabled ? random_password.password[0].result : null
+  administrator_login           = var.administrator_login_enabled ? var.administrator_username : null
+  administrator_password        = var.administrator_login_enabled ? random_password.password[0].result : null
   backup_retention_days         = var.backup_retention_days
   create_mode                   = "Default" # TODO: support DR scenarios
   delegated_subnet_id           = var.delegated_subnet_id
@@ -56,11 +56,16 @@ resource "azurerm_postgresql_flexible_server" "this" {
       zone,
       high_availability
     ]
+
+    precondition {
+      condition     = var.administrator_login_enabled || !var.password_auth_enabled
+      error_message = "administrator_login_enabled can only be false when password_auth_enabled is false."
+    }
   }
 }
 
 resource "random_password" "password" {
-  count = var.password_auth_enabled ? 1 : 0
+  count = var.administrator_login_enabled ? 1 : 0
 
   length           = 48
   special          = true
@@ -100,4 +105,10 @@ module "database" {
   admin_groups                       = each.value.admin_groups
   admin_identity_object_ids          = each.value.admin_identity_object_ids
   local_owner_account                = each.value.local_owner_account
+  key_roles_by_name                  = var.key_roles_by_name
+}
+
+moved {
+  from = random_password.password
+  to   = random_password.password[0]
 }

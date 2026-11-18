@@ -71,6 +71,12 @@ variable "admin_identity_object_ids" {
   default = []
 }
 
+variable "key_roles_by_name" {
+  type        = bool
+  description = "Key the Entra role resources on role name instead of object ID. Required when a principal's object ID is only known after apply (e.g. a managed identity created in the same run). Changing this on an existing deployment changes the resource addresses of the roles."
+  default     = false
+}
+
 variable "provisioning_identity_name" {
   type        = string
   description = "The PostgreSQL login name that Terraform authenticates as when provisioning roles and privileges. In password mode this is the server administrator username; in Entra-only mode set it to the Entra principal name Terraform connects as, so object-owner default privileges are attributed to the correct owner."

@@ -11,8 +11,8 @@ output "administrator_username" {
 }
 
 output "administrator_password" {
-  description = "The generated administrator password. Null when password authentication is disabled."
-  value       = var.password_auth_enabled ? random_password.password[0].result : null
+  description = "The generated administrator password. Null when administrator_login_enabled is false."
+  value       = var.administrator_login_enabled ? random_password.password[0].result : null
   sensitive   = true
 }
 

@@ -96,6 +96,18 @@ variable "password_auth_enabled" {
   default     = true
 }
 
+variable "administrator_login_enabled" {
+  type        = bool
+  description = "Whether the server gets a local administrator login and generated password. Set to false, together with password_auth_enabled = false, for an Entra ID only server without a local administrator."
+  default     = true
+}
+
+variable "key_roles_by_name" {
+  type        = bool
+  description = "Key the Entra role resources of each database on role name instead of object ID. Required when a principal's object ID is only known after apply, such as a managed identity created in the same run. Changing this on an existing deployment changes the resource addresses of the roles, so add moved blocks or recreate them."
+  default     = false
+}
+
 variable "active_directory_auth_enabled" {
   type        = bool
   description = "Whether Active Directory authentication is enabled for the PostgreSQL Flexible Server."

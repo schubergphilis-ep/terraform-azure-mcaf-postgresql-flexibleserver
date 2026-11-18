@@ -155,6 +155,13 @@ module "postgresql" {
   # set this to the Entra principal name Terraform authenticates as so object-owner default
   # privileges are attributed correctly. Leave unset when connecting as the local admin (password).
   # provisioning_identity_name = "terraform-deployer"
+  #
+  # For an Entra ID only server without a local administrator, also set:
+  # password_auth_enabled       = false
+  # administrator_login_enabled = false
+  #
+  # When reader/writer/admin principals are created in the same apply, key their roles on name:
+  # key_roles_by_name = true
 
   # Network configuration
   public_network_access_enabled        = false
@@ -216,6 +223,8 @@ module "postgresql" {
         username       = "app_staging_owner"
         object_id      = azurerm_user_assigned_identity.app.principal_id
         principal_type = "ServicePrincipal"
+        # The principal_id is only known after apply, so select federated mode explicitly.
+        federated = true
       }
 
       writer_groups = [
