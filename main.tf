@@ -105,7 +105,6 @@ module "database" {
   admin_groups                       = each.value.admin_groups
   admin_identity_object_ids          = each.value.admin_identity_object_ids
   local_owner_account                = each.value.local_owner_account
-  key_roles_by_name                  = var.key_roles_by_name
 }
 
 moved {

@@ -20,18 +20,17 @@ data "azuread_group" "admin_groups" {
 }
 
 locals {
-  # Resource keys for the Entra roles. By default they are keyed on object ID (as in v0.2.0 and
-  # earlier), so existing state is kept. With key_roles_by_name they are keyed on the role name,
-  # which is known at plan time also for principals that are created in the same apply.
+  # Entra roles are keyed on the role name, which is known at plan time also for principals
+  # created in the same apply (their object IDs are not).
   readers = merge(
-    { for group in var.reader_groups : (var.key_roles_by_name ? "${group.role_prefix != null ? group.role_prefix : data.azuread_group.reader_groups[group.group_name].display_name}_group_reader" : data.azuread_group.reader_groups[group.group_name].object_id) =>
+    { for group in var.reader_groups : "${group.role_prefix != null ? group.role_prefix : data.azuread_group.reader_groups[group.group_name].display_name}_group_reader" =>
       {
         role_name = "${group.role_prefix != null ? group.role_prefix : data.azuread_group.reader_groups[group.group_name].display_name}_group_reader"
         object_id = data.azuread_group.reader_groups[group.group_name].object_id
         type      = "group"
       }
     },
-    { for mid in var.reader_managed_identity_object_ids : (var.key_roles_by_name ? "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_reader" : mid.object_id) =>
+    { for mid in var.reader_managed_identity_object_ids : "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_reader" =>
       {
         role_name = "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_reader"
         object_id = mid.object_id
@@ -41,14 +40,14 @@ locals {
   )
 
   writers = merge(
-    { for group in var.writer_groups : (var.key_roles_by_name ? "${group.role_prefix != null ? group.role_prefix : data.azuread_group.writer_groups[group.group_name].display_name}_group_writer" : data.azuread_group.writer_groups[group.group_name].object_id) =>
+    { for group in var.writer_groups : "${group.role_prefix != null ? group.role_prefix : data.azuread_group.writer_groups[group.group_name].display_name}_group_writer" =>
       {
         role_name = "${group.role_prefix != null ? group.role_prefix : data.azuread_group.writer_groups[group.group_name].display_name}_group_writer"
         object_id = data.azuread_group.writer_groups[group.group_name].object_id
         type      = "group"
       }
     },
-    { for mid in var.writer_managed_identity_object_ids : (var.key_roles_by_name ? "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_writer" : mid.object_id) =>
+    { for mid in var.writer_managed_identity_object_ids : "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_writer" =>
       {
         role_name = "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_writer"
         object_id = mid.object_id
@@ -58,14 +57,14 @@ locals {
   )
 
   admins = merge(
-    { for group in var.admin_groups : (var.key_roles_by_name ? "${group.role_prefix != null ? group.role_prefix : data.azuread_group.admin_groups[group.group_name].display_name}_group_admin" : data.azuread_group.admin_groups[group.group_name].object_id) =>
+    { for group in var.admin_groups : "${group.role_prefix != null ? group.role_prefix : data.azuread_group.admin_groups[group.group_name].display_name}_group_admin" =>
       {
         role_name = "${group.role_prefix != null ? group.role_prefix : data.azuread_group.admin_groups[group.group_name].display_name}_group_admin"
         object_id = data.azuread_group.admin_groups[group.group_name].object_id
         type      = "group"
       }
     },
-    { for mid in var.admin_identity_object_ids : (var.key_roles_by_name ? "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_admin" : mid.object_id) =>
+    { for mid in var.admin_identity_object_ids : "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_admin" =>
       {
         role_name = "${mid.role_prefix != null ? mid.role_prefix : mid.principal_name}_service_admin"
         object_id = mid.object_id
