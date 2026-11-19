@@ -25,8 +25,13 @@ variable "administrator_username" {
 
 variable "provisioning_identity_name" {
   type        = string
-  description = "The PostgreSQL login name that the postgresql provider authenticates as when creating roles and privileges. Defaults to the server administrator username (password mode). When password authentication is disabled and the provider connects via Entra ID, set this to the Entra principal name Terraform runs as so that object-owner default privileges are attributed to the correct owner. Can be overridden per database via the database's administrator_username."
+  description = "The PostgreSQL login name that the postgresql provider authenticates as when creating roles and privileges. Defaults to the server administrator username (password mode). When password authentication is disabled and the provider connects via Entra ID, set this to the Entra principal name Terraform runs as so that object-owner default privileges are attributed to the correct owner. Can be overridden per database via the database's administrator_username. Must be the role name as PostgreSQL stores it: at most 63 characters, as PostgreSQL truncates longer role names (e.g. guest UPNs with #EXT#)."
   default     = null
+
+  validation {
+    condition     = var.provisioning_identity_name == null || length(coalesce(var.provisioning_identity_name, "x")) <= 63
+    error_message = "provisioning_identity_name must be at most 63 characters, as PostgreSQL truncates longer role names. Use the truncated name (or a service principal's object ID)."
+  }
 }
 
 variable "backup_retention_days" {
