@@ -159,9 +159,6 @@ module "postgresql" {
   # For an Entra ID only server without a local administrator, also set:
   # password_auth_enabled       = false
   # administrator_login_enabled = false
-  #
-  # When reader/writer/admin principals are created in the same apply, key their roles on name:
-  # key_roles_by_name = true
 
   # Network configuration
   public_network_access_enabled        = false
