@@ -79,7 +79,7 @@ variable "key_roles_by_name" {
 
 variable "provisioning_identity_name" {
   type        = string
-  description = "The PostgreSQL login name that Terraform authenticates as when provisioning roles and privileges. In password mode this is the server administrator username; in Entra-only mode set it to the Entra principal name Terraform connects as, so object-owner default privileges are attributed to the correct owner."
+  description = "The PostgreSQL login name that Terraform authenticates as when provisioning roles and privileges. In password mode this is the server administrator username; in Entra-only mode set it to the Entra principal name Terraform connects as, so object-owner default privileges are attributed to the correct owner. At most 63 characters (PostgreSQL truncates longer role names)."
 }
 
 variable "local_owner_account" {
