@@ -97,14 +97,8 @@ variable "public_network_access_enabled" {
 
 variable "password_auth_enabled" {
   type        = bool
-  description = "Whether password authentication is enabled for the PostgreSQL Flexible Server."
-  default     = true
-}
-
-variable "administrator_login_enabled" {
-  type        = bool
-  description = "Whether the server gets a local administrator login and generated password. Set to false, together with password_auth_enabled = false, for an Entra ID only server without a local administrator."
-  default     = true
+  description = "Whether password authentication is enabled for the PostgreSQL Flexible Server. Opt-in: when false (the default), the server is Entra ID only and gets no local administrator login or password. Set to true for a local administrator with a generated password, or for password owner accounts."
+  default     = false
 }
 
 variable "active_directory_auth_enabled" {

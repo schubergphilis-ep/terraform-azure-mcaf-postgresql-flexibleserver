@@ -5,8 +5,8 @@ resource "azurerm_postgresql_flexible_server" "this" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  administrator_login           = var.administrator_login_enabled ? var.administrator_username : null
-  administrator_password        = var.administrator_login_enabled ? random_password.password[0].result : null
+  administrator_login           = var.password_auth_enabled ? var.administrator_username : null
+  administrator_password        = var.password_auth_enabled ? random_password.password[0].result : null
   backup_retention_days         = var.backup_retention_days
   create_mode                   = "Default" # TODO: support DR scenarios
   delegated_subnet_id           = var.delegated_subnet_id
@@ -58,14 +58,19 @@ resource "azurerm_postgresql_flexible_server" "this" {
     ]
 
     precondition {
-      condition     = var.administrator_login_enabled || !var.password_auth_enabled
-      error_message = "administrator_login_enabled can only be false when password_auth_enabled is false."
+      condition     = var.password_auth_enabled || var.active_directory_auth_enabled
+      error_message = "Enable at least one of password_auth_enabled and active_directory_auth_enabled."
+    }
+
+    precondition {
+      condition     = var.password_auth_enabled || length(local.password_owner_databases) == 0
+      error_message = "Password owner accounts need password_auth_enabled = true, or set object_id (federated) on local_owner_account for: ${join(", ", local.password_owner_databases)}."
     }
   }
 }
 
 resource "random_password" "password" {
-  count = var.administrator_login_enabled ? 1 : 0
+  count = var.password_auth_enabled ? 1 : 0
 
   length           = 48
   special          = true
