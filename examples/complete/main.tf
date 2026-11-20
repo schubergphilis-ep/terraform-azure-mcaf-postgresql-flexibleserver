@@ -156,9 +156,8 @@ module "postgresql" {
   # privileges are attributed correctly. Leave unset when connecting as the local admin (password).
   # provisioning_identity_name = "terraform-deployer"
   #
-  # For an Entra ID only server without a local administrator, also set:
-  # password_auth_enabled       = false
-  # administrator_login_enabled = false
+  # For an Entra ID only server without a local administrator, leave password_auth_enabled at its
+  # default (false) and connect the provider with Entra ID as shown above.
 
   # Network configuration
   public_network_access_enabled        = false
