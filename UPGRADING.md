@@ -25,6 +25,11 @@ Databases with a password owner account (`local_owner_account` without `object_i
 `password_auth_enabled = true`; the plan fails with a precondition error otherwise. Set
 `object_id` to make the owner a federated (Entra ID) account instead.
 
+### Removed input `private_service_connection_is_manual`
+
+This input was declared but never used. Remove it from your module call if you set it; it had
+no effect.
+
 ### Entra roles are keyed on role name
 
 #### What changed

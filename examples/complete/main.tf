@@ -160,8 +160,7 @@ module "postgresql" {
   # default (false) and connect the provider with Entra ID as shown above.
 
   # Network configuration
-  public_network_access_enabled        = false
-  private_service_connection_is_manual = false
+  public_network_access_enabled = false
 
   # Customer-managed key
   customer_managed_key = {
