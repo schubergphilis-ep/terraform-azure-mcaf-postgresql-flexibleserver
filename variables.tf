@@ -125,12 +125,6 @@ variable "high_availability_standby_zone" {
   default     = "2"
 }
 
-variable "private_service_connection_is_manual" {
-  type        = bool
-  description = "Whether the private service connection requires manual approval."
-  default     = false
-}
-
 variable "geo_redundant_backup_enabled" {
   type        = bool
   description = "Whether geo-redundant backup is enabled for the PostgreSQL Flexible Server."

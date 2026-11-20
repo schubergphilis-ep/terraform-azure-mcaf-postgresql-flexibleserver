@@ -1,6 +1,7 @@
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_postgresql_flexible_server" "this" {
+  # checkov:skip=CKV2_AZURE_57: the server uses VNet integration (delegated_subnet_id); private endpoints are left to the caller
   name                = var.name
   location            = var.location
   resource_group_name = var.resource_group_name
