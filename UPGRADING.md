@@ -1,5 +1,42 @@
 # Upgrading
 
+## Upgrading to v2.0.0
+
+v2.0.0 scopes database access to the database it is configured for. In v1.x, Entra readers,
+writers and admins were members of the server-wide roles `pg_read_all_data` and
+`pg_write_all_data`, and `PUBLIC` could connect to every database. A reader on one database could
+therefore read every database on the server, and a writer could write to all of them.
+
+### What changes
+
+- Each database gets PostgreSQL group roles (`NOLOGIN`) `<database>_readers`, `_writers` and
+  `_admins` with privileges on that database only (see [Database access](README.md#database-access)).
+- The login roles of Entra groups and managed identities are a member of those groups instead of
+  `pg_read_all_data` / `pg_write_all_data`. **Their names don't change**, so applications keep
+  their database user name.
+- `CONNECT` and `TEMPORARY` on each database are revoked from `PUBLIC`. The access groups, the
+  owner account and `azure_pg_admin` (server administrators) get `CONNECT`.
+- Each Entra principal can be used once across all databases and access levels; the plan fails
+  with a precondition error otherwise.
+- Databases are dropped before their roles, so removing a database whose owner created tables no
+  longer fails with *"role ... cannot be dropped because some objects depend on it"*.
+- New: `object_id` on `reader_groups`, `writer_groups` and `admin_groups` to skip the group lookup
+  in Microsoft Graph.
+
+### What you need to do
+
+No state moves are needed. The plan creates the access groups and their grants, updates the
+Entra login roles in place (membership only) and removes the per-admin grants that the
+`_admins` group replaces. During the apply, a principal can lack its privileges for a few
+seconds while its membership moves to the access group, so apply outside peak hours. Before you
+apply, check:
+
+| Situation | Action |
+|---|---|
+| A principal needs access to more than one database (it used to get that through `pg_read_all_data`) | Add it to each database it needs. Using the same principal twice fails; create an Entra ID group per database and access level and add the principal to those groups. |
+| The same group or managed identity is listed more than once (other database or access level) | The plan fails with *"Each Entra ID group and managed identity can be used once"*. Use an Entra ID group per database and access level. |
+| Roles you created yourself, outside this module, connect to a database | They can no longer connect through `PUBLIC`. Grant them membership of an access group, for example `GRANT app_readers TO my_role;`, or `CONNECT` on the database. |
+
 ## Upgrading to v1.0.0
 
 v1.0.0 has two breaking changes. Check both:

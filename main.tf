@@ -64,6 +64,16 @@ resource "azurerm_postgresql_flexible_server" "this" {
     }
 
     precondition {
+      condition     = length(local.duplicate_entra_principals) == 0
+      error_message = "Each Entra ID group and managed identity can be used once across all databases and access levels: ${join(", ", local.duplicate_entra_principals)}. To give a principal access to more than one database, create an Entra ID group per database and access level, and add the principal to those groups."
+    }
+
+    precondition {
+      condition     = length(local.duplicate_entra_role_names) == 0
+      error_message = "Two principals would get the same PostgreSQL role name (roles are server-wide): ${join(", ", local.duplicate_entra_role_names)}. Set a role_prefix to make the names unique."
+    }
+
+    precondition {
       condition     = var.password_auth_enabled || length(local.password_owner_databases) == 0
       error_message = "Password owner accounts need password_auth_enabled = true, or set object_id (federated) on local_owner_account for: ${join(", ", local.password_owner_databases)}."
     }
