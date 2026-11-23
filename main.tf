@@ -1,7 +1,7 @@
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_postgresql_flexible_server" "this" {
-  # checkov:skip=CKV2_AZURE_57: private endpoints are left to the caller
+  # checkov:skip=CKV2_AZURE_57: networking is the caller's choice: VNet integration via delegated_subnet_id, or a private endpoint created by the caller (e.g. terraform-azure-mcaf-private-endpoints)
   name                = var.name
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -46,19 +46,44 @@ resource "azurerm_postgresql_flexible_server" "this" {
     }
   }
 
+  dynamic "maintenance_window" {
+    for_each = var.maintenance_window != null ? [var.maintenance_window] : []
+    content {
+      day_of_week  = maintenance_window.value.day_of_week
+      start_hour   = maintenance_window.value.start_hour
+      start_minute = maintenance_window.value.start_minute
+    }
+  }
+
   lifecycle {
     ignore_changes = [
       zone,
       high_availability
     ]
+
+    precondition {
+      condition     = var.password_auth_enabled || var.active_directory_auth_enabled
+      error_message = "Enable at least one of password_auth_enabled and active_directory_auth_enabled."
+    }
+
+    precondition {
+      condition     = var.password_auth_enabled || length(local.databases_with_local_users) == 0
+      error_message = "Local PostgreSQL users (local_readers, local_writers, local_admins) log on with a password and need password_auth_enabled = true. Databases with local users: ${join(", ", local.databases_with_local_users)}."
+    }
   }
 }
 
 resource "random_password" "password" {
-  count            = var.password_auth_enabled && var.administrator_ephemeral_password_version == null ? 1 : 0
+  count = var.password_auth_enabled && var.administrator_ephemeral_password_version == null ? 1 : 0
+
   length           = 48
   special          = true
   override_special = "!#$&()-_=+[]{}?"
+}
+
+moved {
+  from = random_password.password
+  to   = random_password.password[0]
 }
 
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "this" {

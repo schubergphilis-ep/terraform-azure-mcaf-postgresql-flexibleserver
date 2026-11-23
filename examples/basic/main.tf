@@ -97,6 +97,9 @@ module "postgresql" {
   storage_size        = 32
   delegated_subnet_id = azurerm_subnet.example.id
 
+  # The provider above connects with the generated admin password.
+  password_auth_enabled = true
+
   customer_managed_key = {
     key_vault_key_id                  = azurerm_key_vault_key.example.id
     primary_user_assigned_identity_id = azurerm_user_assigned_identity.example.id

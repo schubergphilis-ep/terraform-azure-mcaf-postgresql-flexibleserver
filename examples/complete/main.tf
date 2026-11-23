@@ -25,6 +25,7 @@ provider "azurerm" {
   features {}
 }
 
+# Password-based provider connection (works when password_auth_enabled = true).
 provider "postgresql" {
   host            = module.postgresql.fqdn
   port            = 5432
@@ -34,6 +35,26 @@ provider "postgresql" {
   connect_timeout = 15
   superuser       = false
 }
+
+# --- Alternative: connect using Entra ID (Azure AD) instead of a password ---
+# Use this when password_auth_enabled = false (or whenever you prefer federated logon). The
+# cyrilgdn/postgresql provider obtains an Entra token via DefaultAzureCredential and uses it to
+# authenticate, so no password is needed. Requirements:
+#   - active_directory_auth_enabled = true on the server.
+#   - The identity running Terraform must be a member of one of the
+#     active_directory_administrator_groups (so it may create roles).
+#   - Set `username` to that Entra principal name.
+#
+# provider "postgresql" {
+#   host                = module.postgresql.fqdn
+#   port                = 5432
+#   username            = "terraform-deployer" # Entra principal name Terraform runs as
+#   sslmode             = "require"
+#   connect_timeout     = 15
+#   superuser           = false
+#   azure_identity_auth = true
+#   azure_tenant_id     = data.azurerm_client_config.current.tenant_id
+# }
 
 resource "azurerm_resource_group" "example" {
   name     = "rg-postgresql-complete"
@@ -131,9 +152,20 @@ module "postgresql" {
   high_availability_mode         = "ZoneRedundant"
   high_availability_standby_zone = "2"
 
+  # Maintenance window configuration (Saturday 02:30 UTC)
+  maintenance_window = {
+    day_of_week  = 6
+    start_hour   = 2
+    start_minute = 30
+  }
+
   # Authentication configuration
   password_auth_enabled         = true
   active_directory_auth_enabled = true
+
+  # For an Entra ID only server without a local administrator, leave password_auth_enabled at its
+  # default (false) and connect the provider with Entra ID as shown above. Local users
+  # (local_readers, local_writers, local_admins) log on with a password and need it set to true.
 
   # Network configuration
   public_network_access_enabled = false
@@ -158,6 +190,7 @@ module "postgresql" {
       charset   = "UTF8"
       collation = "en_US.utf8"
 
+      # Local account for applications that cannot use an Entra ID token (requires password_auth_enabled).
       local_admins = [
         {
           username = "app_production_owner"
@@ -193,6 +226,17 @@ module "postgresql" {
     "app_staging" = {
       charset   = "UTF8"
       collation = "en_US.utf8"
+
+      # Federated owner: the app connects with its managed identity (Entra ID token) and
+      # owns/migrates its own schema. The identity is created by the caller, not this module.
+      admins = [
+        {
+          name         = azurerm_user_assigned_identity.app.name
+          principal_id = azurerm_user_assigned_identity.app.principal_id
+          client_id    = azurerm_user_assigned_identity.app.client_id
+          role_prefix  = "appowner"
+        }
+      ]
 
       writers = [
         {

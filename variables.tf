@@ -31,8 +31,8 @@ variable "administrator_ephemeral_password_version" {
 
 variable "password_auth_enabled" {
   type        = bool
-  description = "Whether password authentication is enabled for the PostgreSQL Flexible Server."
-  default     = true
+  description = "Whether password authentication is enabled for the PostgreSQL Flexible Server. Opt-in: when false (the default), the server is Entra ID only and gets no local administrator login or password. Set to true for a local administrator with a generated password, or for local PostgreSQL users (`local_readers`, `local_writers`, `local_admins`)."
+  default     = false
 }
 
 variable "active_directory_auth_enabled" {
@@ -126,6 +126,23 @@ variable "geo_redundant_backup_enabled" {
   type        = bool
   description = "Whether geo-redundant backup is enabled for the PostgreSQL Flexible Server."
   default     = true
+}
+
+variable "maintenance_window" {
+  type = object({
+    day_of_week  = optional(number, 0)
+    start_hour   = optional(number, 0)
+    start_minute = optional(number, 0)
+  })
+  default     = null
+  description = <<-DOC
+    A custom maintenance window for the PostgreSQL Flexible Server. If not specified, the system-managed maintenance window is used.
+
+    The maintenance window object supports the following properties:
+    - `day_of_week`  - (Optional) The day of the week for the maintenance window, where `0` is Sunday and `6` is Saturday. Defaults to `0`.
+    - `start_hour`   - (Optional) The start hour (UTC) for the maintenance window, between `0` and `23`. Defaults to `0`.
+    - `start_minute` - (Optional) The start minute for the maintenance window, between `0` and `59`. Defaults to `0`.
+  DOC
 }
 
 variable "tags" {

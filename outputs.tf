@@ -11,8 +11,9 @@ output "administrator_username" {
 }
 
 output "administrator_password" {
-  value     = var.password_auth_enabled && var.administrator_ephemeral_password_version == null ? random_password.password[0].result : null
-  sensitive = true
+  description = "The generated administrator password. Null when password_auth_enabled is false or an ephemeral administrator password is used."
+  value       = var.password_auth_enabled && var.administrator_ephemeral_password_version == null ? random_password.password[0].result : null
+  sensitive   = true
 }
 
 output "databases" {
