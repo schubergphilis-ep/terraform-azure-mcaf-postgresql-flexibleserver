@@ -33,8 +33,8 @@ If you want to learn more about creating good readme files then refer the follow
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.81.0 |
-| <a name="provider_random"></a> [random](#provider\_random) | 3.9.1 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | ~> 4.20 |
+| <a name="provider_random"></a> [random](#provider\_random) | ~> 3.6 |
 
 ## Modules
 
