@@ -25,6 +25,53 @@ Databases with a password owner account (`local_owner_account` without `object_i
 `password_auth_enabled = true`; the plan fails with a precondition error otherwise. Set
 `object_id` to make the owner a federated (Entra ID) account instead.
 
+### Optional: let Terraform connect with Entra ID instead of the admin password
+
+Upgrading to v1.0.0 doesn't require this, but it is the step towards an Entra ID only server.
+Do it in separate applies, in this order:
+
+1. **Keep `password_auth_enabled = true`** for now.
+2. **Create an Entra ID security group** and add the identity Terraform runs as (the pipeline's
+   managed identity or service principal) to it.
+3. **Add the group to `active_directory_administrator_groups` and apply.** The `postgresql`
+   provider still connects with the admin password. Don't switch the provider in the same
+   apply: it would log on as the group before the server knows it, and fail with
+   *"password authentication failed for user \"<group>\""*.
+4. **Switch the provider to Entra ID, set `provisioning_identity_name` to the group name and
+   apply.** Members of the group log on with the group name as user name and their own token:
+
+   ```hcl
+   provider "postgresql" {
+     alias               = "database"
+     host                = module.postgresql.fqdn
+     port                = 5432
+     database            = "postgres"
+     username            = "<group name>"
+     azure_identity_auth = true
+     azure_tenant_id     = data.azurerm_client_config.current.tenant_id
+     sslmode             = "require"
+     superuser           = false
+   }
+
+   module "postgresql" {
+     # ...
+     active_directory_administrator_groups = ["<group name>"]
+     provisioning_identity_name            = "<group name>"
+   }
+   ```
+
+   The plan replaces the default privileges of each owner account for objects created by the
+   provisioning identity (owner `<admin username>` becomes `<group name>`). Password logins of
+   applications keep working. The provider gets its token through Azure's default credential
+   chain, so the pipeline step must be logged on as that identity (for example the `AzureCLI`
+   task or workload identity federation).
+5. **To turn password authentication off**, first make every owner account federated (set
+   `object_id`, and `federated = true` when the identity is created in the same apply) and apply.
+   A managed identity created in that apply can take a minute to become known to Entra ID; if
+   the security label fails with *"the OID isn't found in the tenant"*, apply again. Then set
+   `password_auth_enabled = false` and apply separately. Azure keeps the administrator login name
+   on the server, but nobody can log on with a password any more.
+
 ### Removed input `private_service_connection_is_manual`
 
 This input was declared but never used. Remove it from your module call if you set it; it had
