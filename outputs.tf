@@ -17,12 +17,13 @@ output "administrator_password" {
 }
 
 output "databases" {
-  description = "Map of database names to their id and name."
+  description = "Map of database names to their id, name and local users. local_users is keyed by username and holds the access level and the generated password, which is null for users whose password is supplied through an ephemeral input."
   sensitive   = true
   value = {
     for name, db in module.database : name => {
-      id   = db.id
-      name = db.name
+      id          = db.id
+      name        = db.name
+      local_users = db.local_users
     }
   }
 }

@@ -55,5 +55,6 @@
 | Name | Description |
 |------|-------------|
 | <a name="output_id"></a> [id](#output\_id) | n/a |
+| <a name="output_local_users"></a> [local\_users](#output\_local\_users) | The local PostgreSQL users of the database by username, with their access level and generated password. The password is null when it is supplied through an ephemeral input. |
 | <a name="output_name"></a> [name](#output\_name) | n/a |
 <!-- END_TF_DOCS -->

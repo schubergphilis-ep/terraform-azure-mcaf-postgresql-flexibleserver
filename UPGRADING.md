@@ -108,13 +108,27 @@ databases = {
 - **A local admin has fewer default privileges than the owner account had.** It gets them for
   tables it creates, no longer for sequences and functions, and none for objects created by the
   provisioning identity.
-- **The generated password is no longer exposed.** The `databases` output contains `id` and
-  `name` only, not `local_owner_account`. A generated password (`generate_password = true`, the
-  default) exists only in the Terraform state. To manage the password yourself, set
+- **The generated password moved in the `databases` output.** It is no longer in
+  `local_owner_account` but in `local_users`, keyed by user name:
+
+  ```hcl
+  # v1
+  module.postgresql.databases["app"].local_owner_account.password
+
+  # v2
+  module.postgresql.databases["app"].local_users["app_owner"].password
+  ```
+
+  Each entry also has the `username` and the `access` level (`reader`, `writer` or `admin`). The
+  password is `null` for a user whose password you supply yourself.
+- **A local user gets either a generated password or one you supply, never both.** The default is
+  a generated password (`generate_password = true`). To manage the password yourself, set
   `generate_password = false` and an `ephemeral_password_version`, and pass the password through
   the ephemeral input `local_admins_ephemeral_passwords` (`local_readers_ephemeral_passwords` and
   `local_writers_ephemeral_passwords` for the others), a map of user name to password. Bump the
-  version to rotate it.
+  version to rotate it. The plan fails if the settings contradict each other: a version with
+  `generate_password = true`, no version with `generate_password = false`, no entry in the map
+  for such a user, or an entry for a user that generates its own password.
 - **A federated owner** (`local_owner_account` with `object_id`) becomes an entry in `admins` for
   that identity. It is no longer granted `CONNECT`, nor `ALL` on sequences and functions and
   default privileges for them.
@@ -164,7 +178,7 @@ on as the Entra group that is in `active_directory_administrator_groups`.
 - `use_password_override_special`: the administrator password always uses the special characters
   `!#$&()-_=+[]{}?`, which is what the default `true` gave you. If you set it to `false`, the
   password is replaced on upgrade.
-- The `local_owner_account` entry in the `databases` output.
+- The `local_owner_account` entry in the `databases` output, which is replaced by `local_users`.
 
 **Changed defaults:**
 
