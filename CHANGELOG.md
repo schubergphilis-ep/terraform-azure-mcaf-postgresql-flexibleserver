@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0](https://github.com/schubergphilis-ep/terraform-azure-mcaf-postgresql-flexibleserver/compare/v0.2.0...v1.0.0) (2026-11-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* configurations with reader_groups, writer_groups, admin_groups or *_managed_identity_object_ids / admin_identity_object_ids get new resource addresses for those roles, grants and security labels. Move them with moved blocks before applying, or Terraform recreates the roles. UPGRADING.md describes how to generate the moved blocks.
+
+### 🚀 Features
+
+* support Entra ID only servers and federated owner accounts ([#6](https://github.com/schubergphilis-ep/terraform-azure-mcaf-postgresql-flexibleserver/issues/6)) ([61dea9a](https://github.com/schubergphilis-ep/terraform-azure-mcaf-postgresql-flexibleserver/commit/61dea9a5b743d81a663ef0a861aced7502406c2e))
+
 ## [0.2.0](https://github.com/schubergphilis-ep/terraform-azure-mcaf-postgresql-flexibleserver/compare/v0.1.0...v0.2.0) (2026-11-17)
 
 
