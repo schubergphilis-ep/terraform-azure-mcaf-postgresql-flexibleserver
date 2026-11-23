@@ -98,6 +98,12 @@ resource "azurerm_user_assigned_identity" "app" {
   resource_group_name = azurerm_resource_group.example.name
 }
 
+resource "azurerm_user_assigned_identity" "app_staging" {
+  name                = "mi-app-staging-complete"
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
+}
+
 resource "azurerm_key_vault" "example" {
   name                       = "kv-psql-complete"
   location                   = azurerm_resource_group.example.location
@@ -123,6 +129,7 @@ data "azuread_group" "example" {
   for_each = toset([
     "PostgreSQL-Admins",
     "Database-Admins",
+    "Support-Team",
     "Data-Analysts",
     "Data-Engineers",
     "Developers",
@@ -184,7 +191,12 @@ module "postgresql" {
     }
   ]
 
-  # Databases with role-based access control
+  # Databases with role-based access control.
+  #
+  # PostgreSQL role names are server-wide, not per database. Every `role_prefix` below is unique
+  # (the role is named `<role_prefix>-db-<readers|writers|admins>`), and every principal is used
+  # once across all databases. Reusing a prefix in a second database would try to create the same
+  # role twice. To give a principal access to another database, give it its own `role_prefix`.
   databases = {
     "app_production" = {
       charset   = "UTF8"
@@ -201,7 +213,7 @@ module "postgresql" {
         {
           object_id    = data.azuread_group.example["Database-Admins"].object_id
           display_name = data.azuread_group.example["Database-Admins"].display_name
-          role_prefix  = "admin"
+          role_prefix  = "prod-dba"
         }
       ]
 
@@ -210,15 +222,15 @@ module "postgresql" {
           name         = azurerm_user_assigned_identity.app.name
           principal_id = azurerm_user_assigned_identity.app.principal_id
           client_id    = azurerm_user_assigned_identity.app.client_id
-          role_prefix  = "app"
+          role_prefix  = "prod-app"
         }
       ]
 
       readers = [
         {
-          object_id    = data.azuread_group.example["Data-Analysts"].object_id
-          display_name = data.azuread_group.example["Data-Analysts"].display_name
-          role_prefix  = "analyst"
+          object_id    = data.azuread_group.example["Support-Team"].object_id
+          display_name = data.azuread_group.example["Support-Team"].display_name
+          role_prefix  = "prod-support"
         }
       ]
     }
@@ -231,10 +243,10 @@ module "postgresql" {
       # owns/migrates its own schema. The identity is created by the caller, not this module.
       admins = [
         {
-          name         = azurerm_user_assigned_identity.app.name
-          principal_id = azurerm_user_assigned_identity.app.principal_id
-          client_id    = azurerm_user_assigned_identity.app.client_id
-          role_prefix  = "appowner"
+          name         = azurerm_user_assigned_identity.app_staging.name
+          principal_id = azurerm_user_assigned_identity.app_staging.principal_id
+          client_id    = azurerm_user_assigned_identity.app_staging.client_id
+          role_prefix  = "stg-app"
         }
       ]
 
@@ -242,7 +254,7 @@ module "postgresql" {
         {
           object_id    = data.azuread_group.example["Developers"].object_id
           display_name = data.azuread_group.example["Developers"].display_name
-          role_prefix  = "dev"
+          role_prefix  = "stg-dev"
         }
       ]
     }
