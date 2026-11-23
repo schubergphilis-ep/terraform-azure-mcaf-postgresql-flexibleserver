@@ -14,6 +14,10 @@ terraform {
       source  = "cyrilgdn/postgresql"
       version = ">= 1.25.0"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = ">= 3.0"
+    }
   }
 }
 
@@ -23,7 +27,6 @@ provider "azurerm" {
 
 # Password-based provider connection (works when password_auth_enabled = true).
 provider "postgresql" {
-  alias           = "database"
   host            = module.postgresql.fqdn
   port            = 5432
   username        = module.postgresql.administrator_username
@@ -40,11 +43,9 @@ provider "postgresql" {
 #   - active_directory_auth_enabled = true on the server.
 #   - The identity running Terraform must be a member of one of the
 #     active_directory_administrator_groups (so it may create roles).
-#   - Set `username` to that Entra principal name, and set the module's
-#     `provisioning_identity_name` to the same value so default privileges match the object owner.
+#   - Set `username` to that Entra principal name.
 #
 # provider "postgresql" {
-#   alias               = "database"
 #   host                = module.postgresql.fqdn
 #   port                = 5432
 #   username            = "terraform-deployer" # Entra principal name Terraform runs as
@@ -97,6 +98,12 @@ resource "azurerm_user_assigned_identity" "app" {
   resource_group_name = azurerm_resource_group.example.name
 }
 
+resource "azurerm_user_assigned_identity" "app_staging" {
+  name                = "mi-app-staging-complete"
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
+}
+
 resource "azurerm_key_vault" "example" {
   name                       = "kv-psql-complete"
   location                   = azurerm_resource_group.example.location
@@ -117,12 +124,24 @@ resource "azurerm_key_vault_key" "example" {
 
 data "azurerm_client_config" "current" {}
 
+# The module takes group objects, so the caller does the directory lookup.
+data "azuread_group" "example" {
+  for_each = toset([
+    "PostgreSQL-Admins",
+    "Database-Admins",
+    "Support-Team",
+    "Data-Analysts",
+    "Data-Engineers",
+    "Developers",
+    "BI-Team",
+  ])
+
+  display_name     = each.value
+  security_enabled = true
+}
+
 module "postgresql" {
   source = "../../"
-
-  providers = {
-    postgresql.database = postgresql.database
-  }
 
   name                = "psql-example-complete"
   resource_group_name = azurerm_resource_group.example.name
@@ -151,13 +170,9 @@ module "postgresql" {
   password_auth_enabled         = true
   active_directory_auth_enabled = true
 
-  # When connecting the postgresql provider via Entra ID (see the alternative provider block above),
-  # set this to the Entra principal name Terraform authenticates as so object-owner default
-  # privileges are attributed correctly. Leave unset when connecting as the local admin (password).
-  # provisioning_identity_name = "terraform-deployer"
-  #
   # For an Entra ID only server without a local administrator, leave password_auth_enabled at its
-  # default (false) and connect the provider with Entra ID as shown above.
+  # default (false) and connect the provider with Entra ID as shown above. Local users
+  # (local_readers, local_writers, local_admins) log on with a password and need it set to true.
 
   # Network configuration
   public_network_access_enabled = false
@@ -170,40 +185,52 @@ module "postgresql" {
 
   # Active Directory administrator groups
   active_directory_administrator_groups = [
-    "PostgreSQL-Admins"
+    {
+      object_id    = data.azuread_group.example["PostgreSQL-Admins"].object_id
+      display_name = data.azuread_group.example["PostgreSQL-Admins"].display_name
+    }
   ]
 
-  # Databases with role-based access control
+  # Databases with role-based access control.
+  #
+  # PostgreSQL role names are server-wide, not per database. Every `role_prefix` below is unique
+  # (the role is named `<role_prefix>-db-<readers|writers|admins>`), and every principal is used
+  # once across all databases. Reusing a prefix in a second database would try to create the same
+  # role twice. To give a principal access to another database, give it its own `role_prefix`.
   databases = {
     "app_production" = {
       charset   = "UTF8"
       collation = "en_US.utf8"
 
-      # Password owner account: for applications that cannot use an Entra ID token.
-      # Omit object_id to stay in password mode; the password is generated and exposed via outputs.
-      local_owner_account = {
-        username = "app_production_owner"
-      }
-
-      admin_groups = [
+      # Local account for applications that cannot use an Entra ID token (requires password_auth_enabled).
+      local_admins = [
         {
-          group_name  = "Database-Admins"
-          role_prefix = "admin"
+          username = "app_production_owner"
         }
       ]
 
-      writer_managed_identity_object_ids = [
+      admins = [
         {
-          object_id      = azurerm_user_assigned_identity.app.principal_id
-          principal_name = azurerm_user_assigned_identity.app.name
-          role_prefix    = "app"
+          object_id    = data.azuread_group.example["Database-Admins"].object_id
+          display_name = data.azuread_group.example["Database-Admins"].display_name
+          role_prefix  = "prod-dba"
         }
       ]
 
-      reader_groups = [
+      writers = [
         {
-          group_name  = "Data-Analysts"
-          role_prefix = "analyst"
+          name         = azurerm_user_assigned_identity.app.name
+          principal_id = azurerm_user_assigned_identity.app.principal_id
+          client_id    = azurerm_user_assigned_identity.app.client_id
+          role_prefix  = "prod-app"
+        }
+      ]
+
+      readers = [
+        {
+          object_id    = data.azuread_group.example["Support-Team"].object_id
+          display_name = data.azuread_group.example["Support-Team"].display_name
+          role_prefix  = "prod-support"
         }
       ]
     }
@@ -212,20 +239,22 @@ module "postgresql" {
       charset   = "UTF8"
       collation = "en_US.utf8"
 
-      # Federated owner account: the app connects with its managed identity (Entra ID token)
-      # and owns/migrates its own schema. The identity is created by the caller, not this module.
-      local_owner_account = {
-        username       = "app_staging_owner"
-        object_id      = azurerm_user_assigned_identity.app.principal_id
-        principal_type = "ServicePrincipal"
-        # The principal_id is only known after apply, so select federated mode explicitly.
-        federated = true
-      }
-
-      writer_groups = [
+      # Federated owner: the app connects with its managed identity (Entra ID token) and
+      # owns/migrates its own schema. The identity is created by the caller, not this module.
+      admins = [
         {
-          group_name  = "Developers"
-          role_prefix = "dev"
+          name         = azurerm_user_assigned_identity.app_staging.name
+          principal_id = azurerm_user_assigned_identity.app_staging.principal_id
+          client_id    = azurerm_user_assigned_identity.app_staging.client_id
+          role_prefix  = "stg-app"
+        }
+      ]
+
+      writers = [
+        {
+          object_id    = data.azuread_group.example["Developers"].object_id
+          display_name = data.azuread_group.example["Developers"].display_name
+          role_prefix  = "stg-dev"
         }
       ]
     }
@@ -234,21 +263,24 @@ module "postgresql" {
       charset   = "UTF8"
       collation = "en_US.utf8"
 
-      reader_groups = [
+      readers = [
         {
-          group_name  = "Data-Analysts"
-          role_prefix = "analyst"
+          object_id    = data.azuread_group.example["Data-Analysts"].object_id
+          display_name = data.azuread_group.example["Data-Analysts"].display_name
+          role_prefix  = "analyst"
         },
         {
-          group_name  = "BI-Team"
-          role_prefix = "bi"
+          object_id    = data.azuread_group.example["BI-Team"].object_id
+          display_name = data.azuread_group.example["BI-Team"].display_name
+          role_prefix  = "bi"
         }
       ]
 
-      admin_groups = [
+      admins = [
         {
-          group_name  = "Data-Engineers"
-          role_prefix = "engineer"
+          object_id    = data.azuread_group.example["Data-Engineers"].object_id
+          display_name = data.azuread_group.example["Data-Engineers"].display_name
+          role_prefix  = "engineer"
         }
       ]
     }

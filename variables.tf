@@ -13,25 +13,40 @@ variable "location" {
   description = "The location of the postgresql server."
 }
 
-variable "active_directory_administrator_groups" {
-  type    = list(string)
-  default = []
-}
-
 variable "administrator_username" {
   type    = string
   default = "sbp_administrator"
 }
 
-variable "provisioning_identity_name" {
-  type        = string
-  description = "The PostgreSQL login name that the postgresql provider authenticates as when creating roles and privileges. Defaults to the server administrator username (password mode). When password authentication is disabled and the provider connects via Entra ID, set this to the Entra principal name Terraform runs as so that object-owner default privileges are attributed to the correct owner. Can be overridden per database via the database's administrator_username. Must be the role name as PostgreSQL stores it: at most 63 characters, as PostgreSQL truncates longer role names (e.g. guest UPNs with #EXT#)."
-  default     = null
+variable "administrator_ephemeral_password" {
+  default   = null
+  ephemeral = true
+  type      = string
+}
 
-  validation {
-    condition     = var.provisioning_identity_name == null || length(coalesce(var.provisioning_identity_name, "x")) <= 63
-    error_message = "provisioning_identity_name must be at most 63 characters, as PostgreSQL truncates longer role names. Use the truncated name (or a service principal's object ID)."
-  }
+variable "administrator_ephemeral_password_version" {
+  default = null
+  type    = number
+}
+
+variable "password_auth_enabled" {
+  type        = bool
+  description = "Whether password authentication is enabled for the PostgreSQL Flexible Server. Opt-in: when false (the default), the server is Entra ID only and gets no local administrator login or password. Set to true for a local administrator with a generated password, or for local PostgreSQL users (`local_readers`, `local_writers`, `local_admins`)."
+  default     = false
+}
+
+variable "active_directory_auth_enabled" {
+  type        = bool
+  description = "Whether Active Directory authentication is enabled for the PostgreSQL Flexible Server."
+  default     = true
+}
+
+variable "active_directory_administrator_groups" {
+  type = set(object({
+    object_id    = string
+    display_name = string
+  }))
+  default = []
 }
 
 variable "backup_retention_days" {
@@ -56,8 +71,8 @@ variable "high_available" {
 
 variable "server_version" {
   type        = string
-  description = "The version of the postgresql server. "
-  default     = "14"
+  description = "The version of the postgresql server."
+  default     = "17"
 }
 
 variable "sku" {
@@ -83,28 +98,10 @@ variable "private_dns_zone_id" {
   default     = null
 }
 
-variable "use_password_override_special" {
-  description = "Set true to use '!#$&()-_=+[]{}?' as special characters, false for default behavior."
-  type        = bool
-  default     = true
-}
-
 variable "public_network_access_enabled" {
   type        = bool
   description = "Whether public network access is enabled for the PostgreSQL Flexible Server."
   default     = false
-}
-
-variable "password_auth_enabled" {
-  type        = bool
-  description = "Whether password authentication is enabled for the PostgreSQL Flexible Server. Opt-in: when false (the default), the server is Entra ID only and gets no local administrator login or password. Set to true for a local administrator with a generated password, or for password owner accounts."
-  default     = false
-}
-
-variable "active_directory_auth_enabled" {
-  type        = bool
-  description = "Whether Active Directory authentication is enabled for the PostgreSQL Flexible Server."
-  default     = true
 }
 
 variable "identity_type" {
@@ -148,93 +145,226 @@ variable "maintenance_window" {
   DOC
 }
 
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
 variable "databases" {
   type = map(object({
     charset                = optional(string, "UTF8")
     collation              = optional(string, "en_US.utf8")
     administrator_username = optional(string)
 
-    local_owner_account = optional(object({
-      username          = string
-      generate_password = optional(bool, true)
-      object_id         = optional(string)
-      principal_type    = optional(string, "ServicePrincipal")
-      federated         = optional(bool)
-    }))
-
-    reader_groups = optional(list(object({
-      group_name  = string
-      role_prefix = optional(string)
+    local_readers = optional(set(object({
+      username                   = string
+      generate_password          = optional(bool, true)
+      ephemeral_password_version = optional(number)
     })), [])
 
-    reader_managed_identity_object_ids = optional(list(object({
-      object_id      = string
-      principal_name = string
-      role_prefix    = optional(string)
+
+    local_writers = optional(set(object({
+      username                   = string
+      generate_password          = optional(bool, true)
+      ephemeral_password_version = optional(number)
     })), [])
 
-    writer_groups = optional(list(object({
-      group_name  = string
-      role_prefix = optional(string)
+    local_admins = optional(set(object({
+      username                   = string
+      generate_password          = optional(bool, true)
+      ephemeral_password_version = optional(number)
     })), [])
 
-    writer_managed_identity_object_ids = optional(list(object({
-      object_id      = string
-      principal_name = string
-      role_prefix    = optional(string)
+    readers = optional(set(object({
+      object_id    = optional(string)
+      name         = optional(string)
+      display_name = optional(string)
+      principal_id = optional(string)
+      client_id    = optional(string)
+      role_prefix  = optional(string)
     })), [])
 
-    admin_groups = optional(list(object({
-      group_name  = string
-      role_prefix = optional(string)
+    writers = optional(set(object({
+      object_id    = optional(string)
+      name         = optional(string)
+      display_name = optional(string)
+      principal_id = optional(string)
+      client_id    = optional(string)
+      role_prefix  = optional(string)
     })), [])
 
-    admin_identity_object_ids = optional(list(object({
-      object_id      = string
-      principal_name = string
-      role_prefix    = optional(string)
+    admins = optional(set(object({
+      object_id    = optional(string)
+      name         = optional(string)
+      display_name = optional(string)
+      principal_id = optional(string)
+      client_id    = optional(string)
+      role_prefix  = optional(string)
     })), [])
   }))
+
   default     = {}
   description = <<-DOC
     A map of databases to create on the PostgreSQL Flexible Server. The map key is used as the database name.
 
     Each database object supports the following properties:
-    - `charset`              - (Optional) The charset of the PostgreSQL database. Defaults to `UTF8`.
-    - `collation`            - (Optional) The collation of the PostgreSQL database. Defaults to `en_US.utf8`.
+    - `charset`                - (Optional) The charset of the PostgreSQL database. Defaults to `UTF8`.
+    - `collation`              - (Optional) The collation of the PostgreSQL database. Defaults to `en_US.utf8`.
     - `administrator_username` - (Optional) The administrator username for the PostgreSQL server. If not specified, the server's default administrator username is used.
 
-    - `reader_groups` - (Optional) A list of Entra ID groups to grant read access to the database.
-      - `group_name`  - (Required) The name of the Entra ID group.
-      - `role_prefix` - (Optional) A prefix for the database role name.
+    Entra ID principals are granted access through `readers`, `writers` and `admins`. Each entry
+    describes one principal, which may be a group, a service principal or a managed identity:
+      - `object_id`    - (Optional) The object ID of the group. Set this for groups.
+      - `principal_id` - (Optional) The principal ID of the service principal or managed identity.
+      - `display_name` - (Optional) The display name of the group.
+      - `name`         - (Optional) The name of the managed identity.
+      - `client_id`    - (Optional) The client ID of the managed identity.
+      - `role_prefix`  - (Optional) A prefix for the database role name. Without it the role takes the principal's display name or name.
 
-    - `reader_managed_identity_object_ids` - (Optional) A list of managed identities to grant read access to the database.
-      - `object_id`      - (Required) The object ID of the managed identity.
-      - `principal_name` - (Required) The principal name of the managed identity.
-      - `role_prefix`    - (Optional) A prefix for the database role name.
+    One of `object_id` or `principal_id` is required: the `pgaadauth` security label needs the
+    principal's Entra object ID. Supply `display_name` for groups or `name` for managed identities
+    as well, because the database role is named after it and the role name is what the principal
+    authenticates as.
 
-    - `writer_groups` - (Optional) A list of Entra ID groups to grant write access to the database.
-      - `group_name`  - (Required) The name of the Entra ID group.
-      - `role_prefix` - (Optional) A prefix for the database role name.
+    Use `object_id` for groups and `principal_id` for service principals and managed identities:
+    the principal type in the `pgaadauth` label (`group` or `service`) follows from which of the
+    two is set. Users are not supported.
 
-    - `writer_managed_identity_object_ids` - (Optional) A list of managed identities to grant write access to the database.
-      - `object_id`      - (Required) The object ID of the managed identity.
-      - `principal_name` - (Required) The principal name of the managed identity.
-      - `role_prefix`    - (Optional) A prefix for the database role name.
+    Role names are server-wide in PostgreSQL, not per database. Every `role_prefix` (or
+    `display_name`/`name` when there is none) must therefore be unique across all databases, or
+    the second role fails to create. The role is named `<role_prefix>-db-<readers|writers|admins>`,
+    or after `display_name`/`name` without a `role_prefix`. Avoid binding the same Entra principal
+    to more than one role.
 
-    - `admin_groups` - (Optional) A list of Entra ID groups to grant admin access to the database.
-      - `group_name`  - (Required) The name of the Entra ID group.
-      - `role_prefix` - (Optional) A prefix for the database role name.
+    `readers` receive `pg_read_all_data`. `writers` additionally receive `pg_write_all_data`.
+    `admins` receive both, plus `USAGE` and `CREATE` on the `public` schema, `ALL` on its tables,
+    and matching default privileges — use `admins` for a principal that creates its own schema.
 
-    - `admin_identity_object_ids` - (Optional) A list of managed identities to grant admin access to the database.
-      - `object_id`      - (Required) The object ID of the managed identity.
-      - `principal_name` - (Required) The principal name of the managed identity.
-      - `role_prefix`    - (Optional) A prefix for the database role name.
+    Local PostgreSQL accounts, for applications that cannot use Entra ID authentication, are
+    declared through `local_readers`, `local_writers` and `local_admins`. They log on with a
+    password, so they need `password_auth_enabled = true`. Usernames are server-wide, like role names:
+      - `username`                   - (Required) The username for the local account.
+      - `generate_password`          - (Optional) Whether the module generates the password. Defaults to `true`.
+                                       The generated password is in the `local_users` entry of the `databases` output.
+      - `ephemeral_password_version` - (Optional) Set it, together with `generate_password = false`, to supply the
+                                       password yourself through the corresponding `local_*_ephemeral_passwords`
+                                       variable (a map of username to password). Bump the version to rotate it.
 
-    - `local_owner_account` - (Optional) A PostgreSQL account with owner access, for applications that manage their own schema. Authentication mode is selected by whether `object_id` is set: password mode (default) creates a role with a password; federated mode (`object_id` set) creates an Entra ID (Azure AD) role that logs on with a token and has no password. The Entra identity itself is not created by this module.
-      - `username`          - (Required) The name of the PostgreSQL owner role.
-      - `generate_password` - (Optional) Password mode only. Whether to auto-generate a password. Defaults to `true`. Set to `false` if the password is managed outside of Terraform.
-      - `object_id`         - (Optional) The Entra ID object ID of a caller-managed managed identity, service principal, or group. Setting this switches the owner account to federated (token) logon.
-      - `principal_type`    - (Optional) The Entra principal type: `ServicePrincipal`, `Group`, or `User`. Defaults to `ServicePrincipal`.
+    A local user gets either a generated password or one you supply, never both. A user with
+    `generate_password = true` must not set `ephemeral_password_version`, and a user with
+    `generate_password = false` must set it and have an entry in the matching
+    `local_*_ephemeral_passwords` map.
   DOC
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for principal in setunion(db.readers, db.writers, db.admins) :
+        principal.object_id != null || principal.principal_id != null
+      ])
+    ])
+    error_message = "Each reader, writer and admin must set object_id (for a group) or principal_id (for a service principal or managed identity). The pgaadauth security label cannot be written without the principal's Entra object ID."
+  }
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for principal in setunion(db.readers, db.writers, db.admins) :
+        principal.display_name != null || principal.name != null || principal.role_prefix != null
+      ])
+    ])
+    error_message = "Each reader, writer and admin must set display_name, name or role_prefix. The database role is named after one of these, and the name must be known at plan time because it identifies the role."
+  }
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for user in setunion(db.local_readers, db.local_writers, db.local_admins) :
+        user.generate_password ? user.ephemeral_password_version == null : user.ephemeral_password_version != null
+      ])
+    ])
+    error_message = "A local user gets either a generated password or one you supply. Set ephemeral_password_version only together with generate_password = false, and set it for every local user with generate_password = false."
+  }
 }
+
+variable "local_readers_ephemeral_passwords" {
+  type        = map(string)
+  description = "Passwords for the local_readers that have generate_password = false, as a map of username to password. Entries for users that generate their own password are rejected."
+  ephemeral   = true
+  default     = null
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for user in db.local_readers :
+        user.generate_password || try(contains(keys(var.local_readers_ephemeral_passwords), user.username), false)
+      ])
+    ])
+    error_message = "Every local_readers user with generate_password = false needs an entry, keyed by username, in local_readers_ephemeral_passwords."
+  }
+
+  validation {
+    condition = var.local_readers_ephemeral_passwords == null ? true : alltrue([
+      for username in keys(var.local_readers_ephemeral_passwords) :
+      contains(flatten([
+        for db in var.databases : [for user in db.local_readers : user.username if !user.generate_password]
+      ]), username)
+    ])
+    error_message = "local_readers_ephemeral_passwords has an entry for a user that is not in local_readers or that generates its own password (generate_password = true). Set generate_password = false and an ephemeral_password_version for that user, or remove the entry."
+  }
+}
+
+variable "local_writers_ephemeral_passwords" {
+  type        = map(string)
+  description = "Passwords for the local_writers that have generate_password = false, as a map of username to password. Entries for users that generate their own password are rejected."
+  ephemeral   = true
+  default     = null
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for user in db.local_writers :
+        user.generate_password || try(contains(keys(var.local_writers_ephemeral_passwords), user.username), false)
+      ])
+    ])
+    error_message = "Every local_writers user with generate_password = false needs an entry, keyed by username, in local_writers_ephemeral_passwords."
+  }
+
+  validation {
+    condition = var.local_writers_ephemeral_passwords == null ? true : alltrue([
+      for username in keys(var.local_writers_ephemeral_passwords) :
+      contains(flatten([
+        for db in var.databases : [for user in db.local_writers : user.username if !user.generate_password]
+      ]), username)
+    ])
+    error_message = "local_writers_ephemeral_passwords has an entry for a user that is not in local_writers or that generates its own password (generate_password = true). Set generate_password = false and an ephemeral_password_version for that user, or remove the entry."
+  }
+}
+
+variable "local_admins_ephemeral_passwords" {
+  type        = map(string)
+  description = "Passwords for the local_admins that have generate_password = false, as a map of username to password. Entries for users that generate their own password are rejected."
+  ephemeral   = true
+  default     = null
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for user in db.local_admins :
+        user.generate_password || try(contains(keys(var.local_admins_ephemeral_passwords), user.username), false)
+      ])
+    ])
+    error_message = "Every local_admins user with generate_password = false needs an entry, keyed by username, in local_admins_ephemeral_passwords."
+  }
+
+  validation {
+    condition = var.local_admins_ephemeral_passwords == null ? true : alltrue([
+      for username in keys(var.local_admins_ephemeral_passwords) :
+      contains(flatten([
+        for db in var.databases : [for user in db.local_admins : user.username if !user.generate_password]
+      ]), username)
+    ])
+    error_message = "local_admins_ephemeral_passwords has an entry for a user that is not in local_admins or that generates its own password (generate_password = true). Set generate_password = false and an ephemeral_password_version for that user, or remove the entry."
+  }
+}
+

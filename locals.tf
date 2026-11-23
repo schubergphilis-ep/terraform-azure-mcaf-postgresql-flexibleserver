@@ -1,16 +1,8 @@
-data "azuread_group" "active_directory_administrator_groups" {
-  for_each = toset(var.active_directory_administrator_groups)
-
-  display_name     = each.value
-  security_enabled = true
-}
-
 locals {
-  storage_mb = var.storage_size * 1024
-
-  # Databases with a password (non-federated) owner account; these need password authentication.
-  password_owner_databases = [
+  # Databases that declare local PostgreSQL users. These log on with a password, so they need
+  # password authentication on the server.
+  databases_with_local_users = [
     for name, db in var.databases : name
-    if db.local_owner_account != null && !coalesce(db.local_owner_account.federated, db.local_owner_account.object_id != null)
+    if length(db.local_readers) + length(db.local_writers) + length(db.local_admins) > 0
   ]
 }
