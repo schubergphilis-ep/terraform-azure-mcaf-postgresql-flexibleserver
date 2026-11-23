@@ -226,6 +226,16 @@ variable "databases" {
     as well, because the database role is named after it and the role name is what the principal
     authenticates as.
 
+    Use `object_id` for groups and `principal_id` for service principals and managed identities:
+    the principal type in the `pgaadauth` label (`group` or `service`) follows from which of the
+    two is set. Users are not supported.
+
+    Role names are server-wide in PostgreSQL, not per database. Every `role_prefix` (or
+    `display_name`/`name` when there is none) must therefore be unique across all databases, or
+    the second role fails to create. The role is named `<role_prefix>-db-<readers|writers|admins>`,
+    or after `display_name`/`name` without a `role_prefix`. Avoid binding the same Entra principal
+    to more than one role.
+
     `readers` receive `pg_read_all_data`. `writers` additionally receive `pg_write_all_data`.
     `admins` receive both, plus `USAGE` and `CREATE` on the `public` schema, `ALL` on its tables,
     and matching default privileges — use `admins` for a principal that creates its own schema.
