@@ -45,5 +45,7 @@ No modules.
 
 ## Outputs
 
-No outputs.
+| Name | Description |
+|------|-------------|
+| <a name="output_password"></a> [password](#output\_password) | The generated password. Null when the password is supplied through the ephemeral input. |
 <!-- END_TF_DOCS -->

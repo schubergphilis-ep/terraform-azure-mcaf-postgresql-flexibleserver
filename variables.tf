@@ -241,10 +241,19 @@ variable "databases" {
     and matching default privileges — use `admins` for a principal that creates its own schema.
 
     Local PostgreSQL accounts, for applications that cannot use Entra ID authentication, are
-    declared through `local_readers`, `local_writers` and `local_admins`:
+    declared through `local_readers`, `local_writers` and `local_admins`. They log on with a
+    password, so they need `password_auth_enabled = true`. Usernames are server-wide, like role names:
       - `username`                   - (Required) The username for the local account.
-      - `generate_password`          - (Optional) Whether to generate a password. Defaults to `true`.
-      - `ephemeral_password_version` - (Optional) Version marker used when the password is supplied through the corresponding `local_*_ephemeral_passwords` variable.
+      - `generate_password`          - (Optional) Whether the module generates the password. Defaults to `true`.
+                                       The generated password is in the `local_users` entry of the `databases` output.
+      - `ephemeral_password_version` - (Optional) Set it, together with `generate_password = false`, to supply the
+                                       password yourself through the corresponding `local_*_ephemeral_passwords`
+                                       variable (a map of username to password). Bump the version to rotate it.
+
+    A local user gets either a generated password or one you supply, never both. A user with
+    `generate_password = true` must not set `ephemeral_password_version`, and a user with
+    `generate_password = false` must set it and have an entry in the matching
+    `local_*_ephemeral_passwords` map.
   DOC
 
   validation {
@@ -266,23 +275,96 @@ variable "databases" {
     ])
     error_message = "Each reader, writer and admin must set display_name, name or role_prefix. The database role is named after one of these, and the name must be known at plan time because it identifies the role."
   }
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for user in setunion(db.local_readers, db.local_writers, db.local_admins) :
+        user.generate_password ? user.ephemeral_password_version == null : user.ephemeral_password_version != null
+      ])
+    ])
+    error_message = "A local user gets either a generated password or one you supply. Set ephemeral_password_version only together with generate_password = false, and set it for every local user with generate_password = false."
+  }
 }
 
 variable "local_readers_ephemeral_passwords" {
-  type      = map(string)
-  ephemeral = true
-  default   = null
+  type        = map(string)
+  description = "Passwords for the local_readers that have generate_password = false, as a map of username to password. Entries for users that generate their own password are rejected."
+  ephemeral   = true
+  default     = null
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for user in db.local_readers :
+        user.generate_password || try(contains(keys(var.local_readers_ephemeral_passwords), user.username), false)
+      ])
+    ])
+    error_message = "Every local_readers user with generate_password = false needs an entry, keyed by username, in local_readers_ephemeral_passwords."
+  }
+
+  validation {
+    condition = var.local_readers_ephemeral_passwords == null ? true : alltrue([
+      for username in keys(var.local_readers_ephemeral_passwords) :
+      contains(flatten([
+        for db in var.databases : [for user in db.local_readers : user.username if !user.generate_password]
+      ]), username)
+    ])
+    error_message = "local_readers_ephemeral_passwords has an entry for a user that is not in local_readers or that generates its own password (generate_password = true). Set generate_password = false and an ephemeral_password_version for that user, or remove the entry."
+  }
 }
 
 variable "local_writers_ephemeral_passwords" {
-  type      = map(string)
-  ephemeral = true
-  default   = null
+  type        = map(string)
+  description = "Passwords for the local_writers that have generate_password = false, as a map of username to password. Entries for users that generate their own password are rejected."
+  ephemeral   = true
+  default     = null
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for user in db.local_writers :
+        user.generate_password || try(contains(keys(var.local_writers_ephemeral_passwords), user.username), false)
+      ])
+    ])
+    error_message = "Every local_writers user with generate_password = false needs an entry, keyed by username, in local_writers_ephemeral_passwords."
+  }
+
+  validation {
+    condition = var.local_writers_ephemeral_passwords == null ? true : alltrue([
+      for username in keys(var.local_writers_ephemeral_passwords) :
+      contains(flatten([
+        for db in var.databases : [for user in db.local_writers : user.username if !user.generate_password]
+      ]), username)
+    ])
+    error_message = "local_writers_ephemeral_passwords has an entry for a user that is not in local_writers or that generates its own password (generate_password = true). Set generate_password = false and an ephemeral_password_version for that user, or remove the entry."
+  }
 }
 
 variable "local_admins_ephemeral_passwords" {
-  type      = map(string)
-  ephemeral = true
-  default   = null
+  type        = map(string)
+  description = "Passwords for the local_admins that have generate_password = false, as a map of username to password. Entries for users that generate their own password are rejected."
+  ephemeral   = true
+  default     = null
+
+  validation {
+    condition = alltrue([
+      for db in var.databases : alltrue([
+        for user in db.local_admins :
+        user.generate_password || try(contains(keys(var.local_admins_ephemeral_passwords), user.username), false)
+      ])
+    ])
+    error_message = "Every local_admins user with generate_password = false needs an entry, keyed by username, in local_admins_ephemeral_passwords."
+  }
+
+  validation {
+    condition = var.local_admins_ephemeral_passwords == null ? true : alltrue([
+      for username in keys(var.local_admins_ephemeral_passwords) :
+      contains(flatten([
+        for db in var.databases : [for user in db.local_admins : user.username if !user.generate_password]
+      ]), username)
+    ])
+    error_message = "local_admins_ephemeral_passwords has an entry for a user that is not in local_admins or that generates its own password (generate_password = true). Set generate_password = false and an ephemeral_password_version for that user, or remove the entry."
+  }
 }
 
