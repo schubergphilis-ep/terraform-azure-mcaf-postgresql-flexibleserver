@@ -164,6 +164,7 @@ variable "databases" {
 
     reader_groups = optional(list(object({
       group_name  = string
+      object_id   = optional(string)
       role_prefix = optional(string)
     })), [])
 
@@ -175,6 +176,7 @@ variable "databases" {
 
     writer_groups = optional(list(object({
       group_name  = string
+      object_id   = optional(string)
       role_prefix = optional(string)
     })), [])
 
@@ -186,6 +188,7 @@ variable "databases" {
 
     admin_groups = optional(list(object({
       group_name  = string
+      object_id   = optional(string)
       role_prefix = optional(string)
     })), [])
 
@@ -199,13 +202,31 @@ variable "databases" {
   description = <<-DOC
     A map of databases to create on the PostgreSQL Flexible Server. The map key is used as the database name.
 
+    Access is scoped to the database. Each database gets PostgreSQL group roles (NOLOGIN)
+    `<database>_readers`, `<database>_writers` and `<database>_admins` that hold the privileges on
+    that database only, and only these groups, the owner account and server administrators may
+    connect to it. Each Entra ID group or managed identity below gets a login role, mapped to the
+    Entra object with a `pgaadauth` security label, that is a member of the matching group.
+    Members of an Entra group log on with the group's role name as user name and their own token.
+
+    Readers can read tables and sequences, writers can also insert, update and delete, and admins
+    have all privileges on tables and sequences and can create objects in the `public` schema.
+    Objects created later by the owner account, the provisioning identity or an admin get the same
+    privileges by default.
+
+    Each Entra ID group and managed identity can be used once across all databases and access
+    levels. To give a principal access to more than one database, create an Entra ID group per
+    database and access level (for example `app-readers` and `app2-writers`) and add the principal
+    to those groups.
+
     Each database object supports the following properties:
     - `charset`              - (Optional) The charset of the PostgreSQL database. Defaults to `UTF8`.
     - `collation`            - (Optional) The collation of the PostgreSQL database. Defaults to `en_US.utf8`.
     - `administrator_username` - (Optional) The administrator username for the PostgreSQL server. If not specified, the server's default administrator username is used.
 
     - `reader_groups` - (Optional) A list of Entra ID groups to grant read access to the database.
-      - `group_name`  - (Required) The name of the Entra ID group.
+      - `group_name`  - (Required) The name of the Entra ID group. Used for the role name, and to look up the group when `object_id` is not set.
+      - `object_id`   - (Optional) The object ID of the Entra ID group. Skips the lookup by name, so Terraform needs no Microsoft Graph permissions for it.
       - `role_prefix` - (Optional) A prefix for the database role name.
 
     - `reader_managed_identity_object_ids` - (Optional) A list of managed identities to grant read access to the database.
@@ -214,7 +235,8 @@ variable "databases" {
       - `role_prefix`    - (Optional) A prefix for the database role name.
 
     - `writer_groups` - (Optional) A list of Entra ID groups to grant write access to the database.
-      - `group_name`  - (Required) The name of the Entra ID group.
+      - `group_name`  - (Required) The name of the Entra ID group. Used for the role name, and to look up the group when `object_id` is not set.
+      - `object_id`   - (Optional) The object ID of the Entra ID group. Skips the lookup by name, so Terraform needs no Microsoft Graph permissions for it.
       - `role_prefix` - (Optional) A prefix for the database role name.
 
     - `writer_managed_identity_object_ids` - (Optional) A list of managed identities to grant write access to the database.
@@ -223,7 +245,8 @@ variable "databases" {
       - `role_prefix`    - (Optional) A prefix for the database role name.
 
     - `admin_groups` - (Optional) A list of Entra ID groups to grant admin access to the database.
-      - `group_name`  - (Required) The name of the Entra ID group.
+      - `group_name`  - (Required) The name of the Entra ID group. Used for the role name, and to look up the group when `object_id` is not set.
+      - `object_id`   - (Optional) The object ID of the Entra ID group. Skips the lookup by name, so Terraform needs no Microsoft Graph permissions for it.
       - `role_prefix` - (Optional) A prefix for the database role name.
 
     - `admin_identity_object_ids` - (Optional) A list of managed identities to grant admin access to the database.

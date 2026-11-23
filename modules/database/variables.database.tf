@@ -22,8 +22,9 @@ variable "postgresql_server_id" {
 
 variable "reader_groups" {
   type = list(object({
-    role_prefix = optional(string)
     group_name  = string
+    object_id   = optional(string)
+    role_prefix = optional(string)
   }))
   default = []
 }
@@ -40,6 +41,7 @@ variable "reader_managed_identity_object_ids" {
 variable "writer_groups" {
   type = list(object({
     group_name  = string
+    object_id   = optional(string)
     role_prefix = optional(string)
   }))
   default = []
@@ -57,6 +59,7 @@ variable "writer_managed_identity_object_ids" {
 variable "admin_groups" {
   type = list(object({
     group_name  = string
+    object_id   = optional(string)
     role_prefix = optional(string)
   }))
   default = []
