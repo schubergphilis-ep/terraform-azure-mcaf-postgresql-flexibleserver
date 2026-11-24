@@ -39,5 +39,3 @@ terraform.rc
 
 # Local Lambda function package directories
 **/builds/*
-Plans/*
-docs/*
